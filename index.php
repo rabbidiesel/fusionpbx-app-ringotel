@@ -68,6 +68,7 @@ require_once "resources/paging.php";
 echo "<script language='JavaScript' type='text/javascript' src='" . PROJECT_PATH . "/app/rt/resources/javascript/qrcode/qrcode.min.js'></script>\n";
 echo "<script language='JavaScript' type='text/javascript' src='" . PROJECT_PATH . "/app/rt/resources/javascript/html-to-image.min.js'></script>\n";
 echo "<script language='JavaScript' type='text/javascript' src='" . PROJECT_PATH . "/app/rt/resources/javascript/multiselect-dropdown.js'></script>\n";
+echo "<script language='JavaScript' type='text/javascript' src='" . PROJECT_PATH . "/app/rt/resources/javascript/telnyx-integration.js'></script>\n";
 
 // ERROR Messages 
 echo '	<div id="error_message" class="alert alert-danger alert-dismissible fade show" style="display: none;" role="alert">	';
