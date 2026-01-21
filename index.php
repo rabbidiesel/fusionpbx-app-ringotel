@@ -4085,31 +4085,31 @@ echo '</style>';
 		$('#createActivationModal_modal_body')[0].style.cssText = '';
 	});
 
-const resetUserPasswordEvent = () => {
-	// clear event listeners
-	$('.resetPassword').off('click');
-	// Bind Event Listener [Reset Password]
-	$(".resetPassword").on('click', (function (el) {
-		const id = el.currentTarget.getAttribute('data-id');
-		const extension = el.currentTarget.getAttribute('data-extension');
-		const email = el.currentTarget.getAttribute('data-email'); // Get the email from data attribute
-		const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
+	const resetUserPasswordEvent = () => {
+		// clear event listeners
+		$('.resetPassword').off('click');
+		// Bind Event Listener [Reset Password]
+		$(".resetPassword").on('click', (function (el) {
+			const id = el.currentTarget.getAttribute('data-id');
+			const extension = el.currentTarget.getAttribute('data-extension');
+			const email = el.currentTarget.getAttribute('data-email'); // Get the email from data attribute
+			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
 		
-		// Set the attributes
-		$('#email_for_reset_password').attr('data-id', id);
-		$('#email_for_reset_password').attr('data-extension', extension);
-		$('#email_for_reset_password').attr('data-orgid', orgid);
+			// Set the attributes
+			$('#email_for_reset_password').attr('data-id', id);
+			$('#email_for_reset_password').attr('data-extension', extension);
+			$('#email_for_reset_password').attr('data-orgid', orgid);
 		
-		// AUTO-FILL THE EMAIL
-		if (email && email.trim() !== '') {
-			$('#email_for_reset_password').val(email);
-			$('#reset_user_password_button').attr('disabled', false); // Enable the button since we have an email
-		} else {
-			$('#email_for_reset_password').val('');
-			$('#reset_user_password_button').attr('disabled', true);
-		}
-	}));
-};
+			// AUTO-FILL THE EMAIL
+			if (email && email.trim() !== '') {
+				$('#email_for_reset_password').val(email);
+				$('#reset_user_password_button').attr('disabled', false); // Enable the button since we have an email
+				} else {
+				$('#email_for_reset_password').val('');
+				$('#reset_user_password_button').attr('disabled', true);
+			}
+		}));
+	};
 
 	const activateUserEvent = () => {
 		// clear event listeners
