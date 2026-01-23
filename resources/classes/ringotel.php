@@ -388,68 +388,68 @@ class ringotel {
 		return $this->api->delete_user($param);
 	}
 
-/**
- * UPDATE USER
- */
-public function update_user($queryParams) { 
-    $param = array();
-
-    // Default param
-    $param["orgid"] = $queryParams['orgid'];
-    $param["id"] = $queryParams['id'];
-
-    // Get List Of Extensions
-    $sql = "    select * from v_extensions  ";
-    $sql .= "    where domain_uuid = :domain_uuid ";
-    $sql .= "    and extension = :extension ";
-    $parameters['domain_uuid'] = $_SESSION['domain_uuid'];
-    $parameters['extension'] = $queryParams['extension'];
-    $db = database::new();
-    $extension = $db->select($sql, $parameters, 'row');
-
-    if (isset($extension['extension_uuid'])) {
-        // Name
-        if (isset($queryParams['name'])) {
-            $param["name"] = $queryParams['name'];
-        }
-        
-        // Extension
-        if (isset($queryParams['extension'])) {
-            $param["extension"] = $queryParams['extension'];
-        }
-        
-        // Email
-        if (isset($queryParams['email'])) {
-            $param["email"] = $queryParams['email'];
-        }
-        
-        // Password
-        if (isset($queryParams['password']) && !empty($queryParams['password'])) {
-            $param["password"] = $queryParams['password'];
-        }
-        
-        // Username - ADD THIS
-        if (isset($queryParams['username']) && !empty($queryParams['username'])) {
-            $param["username"] = $queryParams['username'];
-        }
-        
-        // Authname - ADD THIS
-        if (isset($queryParams['authname']) && !empty($queryParams['authname'])) {
-            $param["authname"] = $queryParams['authname'];
-        }
-        
-        // Mobile - ADD THIS
-        if (isset($queryParams['mobile']) && !empty($queryParams['mobile'])) {
-            $param["mobile"] = $queryParams['mobile'];
-        }
-        
-        // Status
-        $param["status"] = isset($queryParams['status']) ? intval($queryParams['status']) : 0;
-
-        // Main
-        return $this->api->update_user($param);
-    }
-}
+	/**
+	 * UPDATE USER
+	 */
+	public function update_user($queryParams) { 
+	    $param = array();
+	
+	    // Default param
+	    $param["orgid"] = $queryParams['orgid'];
+	    $param["id"] = $queryParams['id'];
+	
+	    // Get List Of Extensions
+	    $sql = "    select * from v_extensions  ";
+	    $sql .= "    where domain_uuid = :domain_uuid ";
+	    $sql .= "    and extension = :extension ";
+	    $parameters['domain_uuid'] = $_SESSION['domain_uuid'];
+	    $parameters['extension'] = $queryParams['extension'];
+	    $db = database::new();
+	    $extension = $db->select($sql, $parameters, 'row');
+	
+	    if (isset($extension['extension_uuid'])) {
+	        // Name
+	        if (isset($queryParams['name'])) {
+	            $param["name"] = $queryParams['name'];
+	        }
+	        
+	        // Extension
+	        if (isset($queryParams['extension'])) {
+	            $param["extension"] = $queryParams['extension'];
+	        }
+	        
+	        // Email
+	        if (isset($queryParams['email'])) {
+	            $param["email"] = $queryParams['email'];
+	        }
+	        
+	        // Password
+	        if (isset($queryParams['password']) && !empty($queryParams['password'])) {
+	            $param["password"] = $queryParams['password'];
+	        }
+	        
+	        // Username - ADD THIS
+	        if (isset($queryParams['username']) && !empty($queryParams['username'])) {
+	            $param["username"] = $queryParams['username'];
+	        }
+	        
+	        // Authname - ADD THIS
+	        if (isset($queryParams['authname']) && !empty($queryParams['authname'])) {
+	            $param["authname"] = $queryParams['authname'];
+	        }
+	        
+	        // Mobile - ADD THIS
+	        if (isset($queryParams['mobile']) && !empty($queryParams['mobile'])) {
+	            $param["mobile"] = $queryParams['mobile'];
+	        }
+	        
+	        // Status
+	        $param["status"] = isset($queryParams['status']) ? intval($queryParams['status']) : 0;
+	
+	        // Main
+	        return $this->api->update_user($param);
+	    }
+	}
 
 	/**
 	 * UPDATE USER
