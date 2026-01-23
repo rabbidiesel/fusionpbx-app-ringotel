@@ -64,7 +64,12 @@ if (!empty($_GET)) {
 }
 if (!empty($_POST)) {
     foreach ($_POST as $key => $value) {
-        $queryParams[$key] = sanitizeInput($value);
+        // Don't sanitize passwords - they need special characters
+        if ($key === 'password') {
+            $queryParams[$key] = $value;  // Keep password as-is
+        } else {
+            $queryParams[$key] = sanitizeInput($value);
+        }
     }
 }
 
