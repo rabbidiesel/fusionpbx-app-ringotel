@@ -62,6 +62,15 @@ function get_less_than_30($str, $prefix)
 //define the settings object
 $settings = new settings(["domain_uuid" => $_SESSION['domain_uuid'], "user_uuid" => $_SESSION['user_uuid']]);
 
+//lookup the domain description to default the Ringotel organization name
+$default_org_name = $_SESSION['domain_name'];
+$db = new database;
+$row = $db->select("select domain_description from v_domains where domain_uuid = :domain_uuid", ['domain_uuid' => $_SESSION['domain_uuid']], 'row');
+if (is_array($row) && !empty(trim($row['domain_description'] ?? ''))) {
+	$default_org_name = trim($row['domain_description']);
+}
+unset($db, $row);
+
 //get the application directory
 $application_directory = pathinfo(__dir__)['basename'];
 
@@ -319,10 +328,10 @@ echo '	        </button>';
 echo '	      </div>';
 echo '	      <div class="modal-body" style="width: max-content;">';
 echo '			<div class="input-group mb-3" style="flex-direction: row;width: 100%;">';
-echo '			  <div class="input-group-prepend" style="width: 100%;">';
+echo '			  <div class="input-group-prepend">';
 echo '			    <span class="input-group-text" id="basic-addon1">Organization name</span>';
-echo '				<span class="input-group-text" style="color: #000000;background-color: white;width: 100%;">' . $_SESSION['domain_name'] . '</span>';
 echo '			  </div>';
+echo '			  <input type="text" class="form-control" id="organization_name_input" placeholder="Organization name" aria-label="Organization name" value="' . escape($default_org_name) . '">';
 echo '			</div>';
 echo '			<div class="input-group mb-3" style="flex-direction: row;">';
 echo '			  <div class="input-group-prepend">';
@@ -334,6 +343,33 @@ echo '			  <div class="input-group-append">';
 echo '			    <span class="input-group-text" id="basic-addon2">'.($settings->get('ringotel', 'domain_name_postfix', '-ringotel')).'</span>';
 echo '			</div>';
 echo '	      </div>';
+
+// Region selector — IDs per Ringotel API docs
+$ringotel_regions = [
+	'10' => 'Africa (Cape Town)',
+	'4'  => 'Asia Pacific (Singapore)',
+	'7'  => 'Australia',
+	'9'  => 'Canada',
+	'8'  => 'Europe (Dublin)',
+	'3'  => 'Europe (Frankfurt)',
+	'5'  => 'Europe (London)',
+	'6'  => 'India',
+	'11' => 'South America (São Paulo)',
+	'1'  => 'US East',
+	'2'  => 'US West',
+];
+$default_region = (string) $settings->get('ringotel', 'ringotel_organization_region', '2');
+echo '			<div class="input-group mb-3" style="flex-direction: row;width: 100%;">';
+echo '			  <div class="input-group-prepend">';
+echo '			    <span class="input-group-text" id="basic-addon1">Region</span>';
+echo '			  </div>';
+echo '			  <select class="form-control" id="organization_region_select" aria-label="Region">';
+foreach ($ringotel_regions as $region_id => $region_label) {
+	$selected = ((string) $region_id === $default_region) ? ' selected' : '';
+	echo '			    <option value="' . escape($region_id) . '"' . $selected . '>' . escape($region_label) . '</option>';
+}
+echo '			  </select>';
+echo '			</div>';
 echo '	      <div class="modal-footer">';
 echo '	        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>';
 echo '	    	<button id="create_organization" class="btn btn-primary" role="button" style="color: white;width: 9rem;">';
@@ -405,10 +441,14 @@ echo '	          <span aria-hidden="true">&times;</span>';
 echo '	        </button>';
 echo '	      </div>';
 
-// Get List Of Extensions
-$sql = "    select * from v_extensions  ";
-$sql .= "    where domain_uuid = :domain_uuid ";
-$sql .= "    order by extension asc ";
+// Get List Of Extensions (with voicemail_mail_to fallback email)
+$sql = "    select e.*, v.voicemail_mail_to ";
+$sql .= "    from v_extensions as e ";
+$sql .= "    left join v_voicemails as v ";
+$sql .= "      on v.domain_uuid = e.domain_uuid ";
+$sql .= "     and v.voicemail_id = e.extension ";
+$sql .= "    where e.domain_uuid = :domain_uuid ";
+$sql .= "    order by e.extension asc ";
 $parameters['domain_uuid'] = $_SESSION['domain_uuid'];
 $db = new database;
 $extensions = $db->select($sql, $parameters);
@@ -2489,7 +2529,14 @@ echo '</style>';
 		}));
 	};
 
-	const ExistsExtensionTemplate = ({ extension, extension_uuid, effective_caller_id_name, effective_caller_id_number }) => {
+	const firstEmail = (value) => {
+		if (!value) return '';
+		const first = String(value).split(',')[0];
+		return first ? first.trim() : '';
+	};
+
+	const ExistsExtensionTemplate = ({ extension, extension_uuid, effective_caller_id_name, effective_caller_id_number, voicemail_mail_to }) => {
+		const prefill = firstEmail(voicemail_mail_to).replace(/"/g, '&quot;');
 		return (`
 			<tr id="extension_line_${extension}">
 			  <th style="vertical-align: middle;display: flex;flex-direction: column;border: 0;" scope="row">
@@ -2499,7 +2546,7 @@ echo '</style>';
 			  <td style="vertical-align: middle;font-size: 11pt;">${effective_caller_id_name}</td>
 			  <td style="vertical-align: middle;font-size: 11pt;">${effective_caller_id_number}</td>
 			  <td style="vertical-align: middle;font-size: 11pt;padding: 0.5rem;">
-				<input name="email" class="form-control ext_email" id="ext_email_${extension_uuid}" data-uuid="${extension_uuid}" type="email" style="line-height: 1rem;height: 1.75rem;padding: 0.5rem;" placeholder="provide the email..."></input>
+				<input name="email" class="form-control ext_email" id="ext_email_${extension_uuid}" data-uuid="${extension_uuid}" type="email" value="${prefill}" style="line-height: 1rem;height: 1.75rem;padding: 0.5rem;" placeholder="provide the email..."></input>
 			  </td>
 			  <td style="vertical-align: middle;display: flex;justify-content: center;">
 				<input name="active" class="ext_activate" id="ext_activate_${extension_uuid}" data-uuid="${extension_uuid}" type="checkbox" style="transform: scale(1.25);margin-bottom: 0.2rem;"></input>
@@ -2546,7 +2593,7 @@ echo '</style>';
 								<span class="reSyncPassword" style="color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Password" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
 									<svg fill="#000000" width="15px" height="15px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"/></svg>
 								</span>
-								<span class="activateUser" data-toggle="modal" data-target="#createActivationModal" style="padding: 4px;color:#2196f3; cursor:pointer;" alt="Activate User" data-id="${id}" data-branch="${branchid}" data-extension="${extension}"><i class="fa fa-plug" aria-hidden="true"></i></span>`;
+								<span class="activateUser" data-toggle="modal" data-target="#createActivationModal" style="padding: 4px;color:#2196f3; cursor:pointer;" alt="Activate User" data-id="${id}" data-branch="${branchid}" data-extension="${extension}" data-email="${(other?.info?.email || '').replace(/"/g, '&quot;')}"><i class="fa fa-plug" aria-hidden="true"></i></span>`;
 				break;
 			case 1:
 				statusElement = `
@@ -2782,7 +2829,8 @@ echo '</style>';
 				extension: ext?.extension,
 				extension_uuid: ext?.extension_uuid,
 				effective_caller_id_name: ext?.effective_caller_id_name,
-				effective_caller_id_number: ext?.effective_caller_id_number
+				effective_caller_id_number: ext?.effective_caller_id_number,
+				voicemail_mail_to: ext?.voicemail_mail_to
 			});
 		});
 		$('#table_exists_extensions').html(extensionsPHPListTemplated);
@@ -3223,6 +3271,8 @@ echo '</style>';
 	$('#create_organization').on('click', (function () {
 		$('#create_organization').attr('disabled', true);
 		domain_unique_name = $('#domain_unique_name').val();
+		const organization_name = $('#organization_name_input').val();
+		const organization_region = $('#organization_region_select').val();
 		$('#create_org_text').fadeOut(300);
 		setTimeout(() => {
 			$('#create_org_loading').fadeIn();
@@ -3231,7 +3281,9 @@ echo '</style>';
 				type: "get",
 				cache: true,
 				data: {
-					domain: domain_unique_name
+					domain: domain_unique_name,
+					name: organization_name,
+					region: organization_region
 				},
 				success: function (response) {
 					checkErrors(response);
@@ -4114,6 +4166,17 @@ echo '</style>';
 		}));
 	};
 
+	const voicemailEmailByExtension = (() => {
+		const map = {};
+		const src = <?php echo json_encode($extensions); ?> || [];
+		src.forEach((ext) => {
+			if (ext && ext.extension) {
+				map[ext.extension] = firstEmail(ext.voicemail_mail_to);
+			}
+		});
+		return map;
+	})();
+
 	const activateUserEvent = () => {
 		// clear event listeners
 		$('.activateUser').off('click');
@@ -4121,10 +4184,12 @@ echo '</style>';
 		$(".activateUser").on('click', (function (el) {
 			const id = el.currentTarget.getAttribute('data-id');
 			const extension = el.currentTarget.getAttribute('data-extension');
+			const existingEmail = el.currentTarget.getAttribute('data-email') || '';
 			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
 			$('#email_for_user').attr('data-id', id);
 			$('#email_for_user').attr('data-extension', extension);
 			$('#email_for_user').attr('data-orgid', orgid);
+			$('#email_for_user').val(existingEmail || voicemailEmailByExtension[extension] || '');
 		}));
 	};
 
