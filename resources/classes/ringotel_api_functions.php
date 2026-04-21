@@ -127,7 +127,7 @@ class ringotel_api_functions {
 		$parameters = array(
 			"method" => "createOrganization",
 			"params" => array(
-				"name" => $_SESSION['domain_name'] ?? '',
+				"name" => !empty($param['name']) ? $param['name'] : ($_SESSION['domain_name'] ?? ''),
 				"region" => $param['region'],
 				"domain" => isset($param['domain']) ? $param['domain'] : explode(".", $name)[0] . $this->domain_name_postfix,
 			)

@@ -153,7 +153,7 @@ class ringotel {
 
 		//default param
 		$param = array();
-		$param['name'] = $queryParams['name'];						  # string	org name
+		$param['name'] = !empty($queryParams['name']) ? $queryParams['name'] : $_SESSION['domain_name'];						  # string	org name
 		$param['domain'] = isset($queryParams['domain']) ? ($queryParams['domain'] . $this->domain_name_postfix) : $DomainNameLessThan30;		# string	org domain
 		$param['region'] = $queryParams['region'] ?? $this->ringotel_organization_region; # string	region ID (see below)
 		$param['adminlogin'] = $queryParams['adminlogin'] ?? '';					   # string	(optional) org admin login
@@ -279,6 +279,9 @@ class ringotel {
 		$db = database::new();
 		$extensions = $db->select($sql, $parameters);
 
+		// Map of extension -> voicemail_mail_to for fallback when no email provided by UI
+		$voicemail_emails = $this->get_voicemail_emails_by_extension($_SESSION['domain_uuid']);
+
 		foreach ($preusers as $item) {
 			if ($item['create'] === 'true') {
 				$ext_find = null;
@@ -300,6 +303,12 @@ class ringotel {
 				);
 				if (!empty($item['email'])) {
 					$user['email'] = $item['email'];
+				}
+				else {
+					$vm_email = $this->first_email($voicemail_emails[$ext_find['extension']] ?? null);
+					if (!empty($vm_email)) {
+						$user['email'] = $vm_email;
+					}
 				}
 				$param['users'][] = $user;
 			}
@@ -491,7 +500,10 @@ class ringotel {
 		if (isset($extension['extension_uuid'])) {
 			$param["name"] = $extension['effective_caller_id_name'];
 			$param["extension"] = isset($queryParams['extension']) ? $queryParams['extension'] : $extension['extension'];
-			$param["email"] = $queryParams['email'];
+			$email = !empty($queryParams['email']) ? $queryParams['email'] : $this->first_email($this->get_voicemail_email($_SESSION['domain_uuid'], $extension['extension']));
+			if (!empty($email)) {
+				$param["email"] = $email;
+			}
 			$param["username"] = $extension['username'];
 			$param["authname"] = $extension['authname'];
 			$param["status"] = 1;
@@ -980,5 +992,45 @@ class ringotel {
 	}
 	//
 	//////////////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * Load voicemail_mail_to for all mailboxes in the domain, keyed by voicemail_id.
+	 * Used as a fallback source for the Ringotel user email when none is supplied by the UI.
+	 */
+	private function get_voicemail_emails_by_extension($domain_uuid): array {
+		$sql = "select voicemail_id, voicemail_mail_to from v_voicemails where domain_uuid = :domain_uuid";
+		$parameters = ['domain_uuid' => $domain_uuid];
+		$rows = database::new()->select($sql, $parameters);
+		$map = [];
+		if (is_array($rows)) {
+			foreach ($rows as $row) {
+				$map[$row['voicemail_id']] = $row['voicemail_mail_to'];
+			}
+		}
+		return $map;
+	}
+
+	private function get_voicemail_email($domain_uuid, $extension) {
+		$sql = "select voicemail_mail_to from v_voicemails where domain_uuid = :domain_uuid and voicemail_id = :voicemail_id";
+		$parameters = ['domain_uuid' => $domain_uuid, 'voicemail_id' => $extension];
+		$row = database::new()->select($sql, $parameters, 'row');
+		return is_array($row) ? ($row['voicemail_mail_to'] ?? null) : null;
+	}
+
+	/**
+	 * voicemail_mail_to may hold multiple comma-separated addresses; Ringotel accepts one.
+	 */
+	private function first_email($mail_to) {
+		if (empty($mail_to)) {
+			return null;
+		}
+		foreach (explode(',', $mail_to) as $candidate) {
+			$candidate = trim($candidate);
+			if ($candidate !== '') {
+				return $candidate;
+			}
+		}
+		return null;
+	}
 
 }
