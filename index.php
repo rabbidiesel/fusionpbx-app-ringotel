@@ -1033,6 +1033,48 @@ echo "		-webkit-transform: translateX(22px);";
 echo "		-ms-transform: translateX(22px);";
 echo "		transform: translateX(22px);";
 echo "	}";
+// Responsive Create Users modal — fits narrow screens without horizontal scrolling
+echo "	@media (max-width: 1024px) {";
+echo "		#createUserModal .modal-dialog { max-width: 100%; margin: 0.5rem; }";
+echo "		#createUserModal .modal-content { width: 100% !important; }";
+echo "		#createUserModal #extensions { flex-direction: column !important; }";
+echo "		#createUserModal #exist_extensions { width: 100%; }";
+echo "		#createUserModal #exist_extensions table { width: 100% !important; display: table !important; table-layout: fixed; height: auto !important; max-height: 60vh; overflow-y: auto; }";
+echo "		#createUserModal #exist_extensions tbody { display: table-row-group !important; }";
+echo "		#createUserModal #exist_extensions tr { display: table-row !important; height: auto !important; }";
+echo "		#createUserModal #exist_extensions th,";
+echo "		#createUserModal #exist_extensions td { display: table-cell !important; vertical-align: middle !important; padding: 0.25rem !important; font-size: 9.5pt !important; height: auto !important; line-height: 1.2 !important; }";
+echo "		#createUserModal #exist_extensions tr > :nth-child(1) { width: 1.75rem; }";
+echo "		#createUserModal #exist_extensions tr > :nth-child(2) { width: auto; white-space: nowrap; text-align: left; padding-left: 0.25rem !important; }";
+echo "		#createUserModal #exist_extensions tr > :nth-child(5) { width: 52%; }";
+echo "		#createUserModal #exist_extensions tr > :nth-child(6) { width: 4rem; text-align: center; white-space: nowrap; }";
+echo "		#createUserModal #exist_extensions .extension_column,";
+echo "		#createUserModal #exist_extensions .ext_activate { transform: scale(1) !important; margin: 0 !important; }";
+// Default on narrow screens: hide both CID columns
+echo "		#createUserModal #exist_extensions tr > th:nth-child(3),";
+echo "		#createUserModal #exist_extensions tr > td:nth-child(3),";
+echo "		#createUserModal #exist_extensions tr > th:nth-child(4),";
+echo "		#createUserModal #exist_extensions tr > td:nth-child(4) { display: none !important; }";
+echo "		#createUserModal .ext_email { min-width: 0; padding: 0.25rem !important; height: 1.6rem !important; font-size: 10pt !important; }";
+echo "		#createUserModal .modal-footer { flex-direction: column; align-items: stretch; }";
+echo "		#createUserModal .modal-footer .input-group { margin-bottom: 0.5rem; }";
+echo "		#createUserModal #create_extensions_button { width: 100% !important; }";
+
+// Users-module header — wrap actions so + Add Extensions stays visible
+echo "		#extension_module > div:first-child { flex-wrap: wrap; gap: 0.25rem 0.5rem; }";
+echo "		#extension_module .reSyncAllNames,";
+echo "		#extension_module .reSyncAllPassword { padding: 4px !important; }";
+echo "		#extension_module .reSyncAllNames > div,";
+echo "		#extension_module .reSyncAllPassword > div { width: auto !important; padding: 5px !important; font-size: 9pt !important; }";
+echo "		#extension_module .create_users_button { width: auto !important; padding: 4px 6px; }";
+echo "	}";
+// Landscape / tablet: reserve space for the fixed side menu, show one more column
+echo "	@media (min-width: 577px) and (max-width: 1024px) {";
+echo "		#createUserModal .modal-dialog { margin-left: 80px; max-width: calc(100% - 90px); }";
+echo "		#createUserModal #exist_extensions tr > th:nth-child(3),";
+echo "		#createUserModal #exist_extensions tr > td:nth-child(3) { display: table-cell !important; width: auto; white-space: nowrap; text-align: left; }";
+echo "		#createUserModal #exist_extensions tr > :nth-child(5) { width: 40%; }";
+echo "	}";
 echo '</style>';
 
 ?>
