@@ -78,7 +78,8 @@ $object_method = $queryParams['method'];
 // Permission per method.
 //   Contacts:   "ringotel_contacts"
 //   Everything else needs "ringotel_extensions" (view) plus, for changes, one of
-//   "ringotel_extension_add", "ringotel_extension_edit" or "ringotel_extension_delete".
+//   "ringotel_extension_add", "ringotel_extension_edit", "ringotel_extension_manage"
+//   (activate / disable, resync, reset password) or "ringotel_extension_delete".
 // A method listed with several permissions is allowed when the user holds any of them
 // (the "apply default settings" calls run right after creating an organization or connection).
 $contact_methods = ['get_contacts', 'create_contact', 'update_contact', 'delete_contact', 'import_contacts', 'update_contacts'];
@@ -95,13 +96,14 @@ $method_permissions = [
     'update_organization_with_default_settings' => ['ringotel_extension_add', 'ringotel_extension_edit'],
     'update_branch_with_default_settings' => ['ringotel_extension_add', 'ringotel_extension_edit'],
     // edit
-    'update_user' => ['ringotel_extension_edit'],
+    'update_user' => ['ringotel_extension_edit', 'ringotel_extension_manage'], // also used by the reset password flow
     'update_extension_name' => ['ringotel_extension_edit'],
-    'resync_names' => ['ringotel_extension_edit'],
-    'resync_password' => ['ringotel_extension_edit'],
-    'activate_user' => ['ringotel_extension_edit'],
-    'deactivate_user' => ['ringotel_extension_edit'],
-    'reset_user_password' => ['ringotel_extension_edit'],
+    // manage (activate / disable, resync, reset password)
+    'resync_names' => ['ringotel_extension_manage'],
+    'resync_password' => ['ringotel_extension_manage'],
+    'activate_user' => ['ringotel_extension_manage'],
+    'deactivate_user' => ['ringotel_extension_manage'],
+    'reset_user_password' => ['ringotel_extension_manage'],
     'update_branch_with_updated_settings' => ['ringotel_extension_edit'],
     'update_parks_with_updated_settings' => ['ringotel_extension_edit'],
     'switch_organization_mode' => ['ringotel_extension_edit'],

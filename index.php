@@ -63,10 +63,19 @@ if (!$can_manage_extensions) {
 $can_add = permission_exists("ringotel_extension_add") || if_group("superadmin");
 $can_edit = permission_exists("ringotel_extension_edit") || if_group("superadmin");
 $can_delete = permission_exists("ringotel_extension_delete") || if_group("superadmin");
+$can_manage = permission_exists("ringotel_extension_manage") || if_group("superadmin"); // activate / disable, resync, reset password
+//view permissions for the sections of the extensions page (the Users/Extensions section itself is covered by ringotel_extensions)
+$can_view_organization = permission_exists("ringotel_organization_view") || if_group("superadmin");
+$can_view_connections = permission_exists("ringotel_connection_view") || if_group("superadmin");
+$can_view_parks = permission_exists("ringotel_park_view") || if_group("superadmin");
 $body_classes = array();
 if (!$can_add) { $body_classes[] = 'ringotel-no-add'; }
 if (!$can_edit) { $body_classes[] = 'ringotel-no-edit'; }
 if (!$can_delete) { $body_classes[] = 'ringotel-no-delete'; }
+if (!$can_manage) { $body_classes[] = 'ringotel-no-manage'; }
+if (!$can_view_organization) { $body_classes[] = 'ringotel-no-organization'; }
+if (!$can_view_connections) { $body_classes[] = 'ringotel-no-connections'; }
+if (!$can_view_parks) { $body_classes[] = 'ringotel-no-parks'; }
 if (!empty($body_classes)) {
 	echo "<script>document.body.classList.add('" . implode("','", $body_classes) . "');</script>\n";
 }
@@ -126,6 +135,13 @@ echo '	  <button type="button" class="close" data-dismiss="alert" aria-label="Cl
 echo '	    <span aria-hidden="true">&times;</span> ';
 echo '	  </button> ';
 echo '	</div> ';
+
+// ORGANIZATION MISSING, shown instead of the create panel to users without the organization view permission
+if (!$can_view_organization) {
+	echo '	<div id="not_exist_organization_limited" class="alert alert-warning" style="display: none;" role="alert">	';
+	echo '	  <strong>Ringotel is not set up for this domain yet.</strong> Please contact an administrator.';
+	echo '	</div> ';
+}
 
 // LOADING INIT
 echo '	<div id="init_loading" class="justify-content-center" style="display: flex;padding: 8rem;font-size: large;vertical-align: middle;flex-direction: row;align-items: center;align-content: center;flex-wrap: nowrap;">	';
@@ -1172,13 +1188,18 @@ echo "	body.ringotel-no-add [data-target='#createConnectionModal'], body.ringote
 echo "	body.ringotel-no-add #create_parks_modal_button, body.ringotel-no-add #create_users_button,";
 echo "	body.ringotel-no-add #integration_create, body.ringotel-no-add #manage_numbers_activate_button { display: none !important; }";
 echo "	body.ringotel-no-edit [id^='editConnectModal_button_'], body.ringotel-no-edit .edit_user,";
-echo "	body.ringotel-no-edit .reSyncAllNames, body.ringotel-no-edit .reSyncAllPassword, body.ringotel-no-edit .reSyncPassword,";
-echo "	body.ringotel-no-edit .resetPassword, body.ringotel-no-edit .activateUser, body.ringotel-no-edit .deactivateUser,";
 echo "	body.ringotel-no-edit #parks_update, body.ringotel-no-edit #parks_save, body.ringotel-no-edit .sms_trunk_save,";
 echo "	body.ringotel-no-edit #packageid_switcher_container { display: none !important; }";
+echo "	body.ringotel-no-manage .reSyncAllNames, body.ringotel-no-manage .reSyncAllPassword, body.ringotel-no-manage .reSyncPassword,";
+echo "	body.ringotel-no-manage .resetPassword, body.ringotel-no-manage .activateUser, body.ringotel-no-manage .deactivateUser { display: none !important; }";
 echo "	body.ringotel-no-delete #delete_organization, body.ringotel-no-delete .delete_connect, body.ringotel-no-delete .delete_user,";
 echo "	body.ringotel-no-delete .detachUser, body.ringotel-no-delete .sms_trunk_delete, body.ringotel-no-delete #manageNumbersModalDisable { display: none !important; }";
 echo "	body.ringotel-no-edit.ringotel-no-delete .options_user, body.ringotel-no-edit.ringotel-no-delete .user_card_options { display: none !important; }";
+// Hide the sections the current user may not see
+echo "	body.ringotel-no-organization #exist_organization, body.ringotel-no-organization #not_exist_organization,";
+echo "	body.ringotel-no-organization #not_exist_organization_note { display: none !important; }";
+echo "	body.ringotel-no-connections #connection_module { display: none !important; }";
+echo "	body.ringotel-no-parks #parks_module { display: none !important; }";
 echo '</style>';
 
 ?>
@@ -2703,14 +2724,14 @@ echo '</style>';
 				break;
 			case -1:
 				statusElement = `
-								<span class="reSyncPassword" style="color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Password" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
+								<span class="reSyncPassword" title="Resync password" style="color: #2196f3;cursor: pointer;padding: 8px;opacity: 0.75;" alt="Resync Password" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
 									<svg fill="#000000" width="15px" height="15px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"/></svg>
 								</span>
-								<span class="activateUser" data-toggle="modal" data-target="#createActivationModal" style="padding: 4px;color:#2196f3; cursor:pointer;" alt="Activate User" data-id="${id}" data-branch="${branchid}" data-extension="${extension}" data-email="${(other?.info?.email || '').replace(/"/g, '&quot;')}"><i class="fa fa-plug" aria-hidden="true"></i></span>`;
+								<span class="activateUser" title="Activate" data-toggle="modal" data-target="#createActivationModal" style="padding: 4px;color:#2196f3; cursor:pointer;" alt="Activate User" data-id="${id}" data-branch="${branchid}" data-extension="${extension}" data-email="${(other?.info?.email || '').replace(/"/g, '&quot;')}"><i class="fa fa-plug" aria-hidden="true"></i></span>`;
 				break;
 			case 1:
 				statusElement = `
-								<span class="reSyncPassword" style="color: #2196f3;cursor: pointer;padding: 8px;;opacity: 0.75;" alt="Resync Password" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
+								<span class="reSyncPassword" title="Resync password" style="color: #2196f3;cursor: pointer;padding: 8px;;opacity: 0.75;" alt="Resync Password" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
 									<svg fill="#000000" width="15px" height="15px" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"/></svg>
 								</span>
 								<span class="resetPassword" data-toggle="modal" data-target="#resetPasswordModal" data-id="${id}" data-branch="${branchid}" data-extension="${extension}" data-email="${other?.info?.email || other?.email || ''}">
@@ -2725,13 +2746,13 @@ echo '</style>';
 									<i class="fa fa-key" aria-hidden="true" style="padding-bottom: 3px;color: #e3ba1b;"></i>
 								  </button>
 								</span>
-								<span class="deactivateUser" style="padding-left: 8px;padding-right: 4px;color: #2196f3;cursor: pointer;" alt="Deactivate User" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
+								<span class="deactivateUser" title="Disable" style="padding-left: 8px;padding-right: 4px;color: #2196f3;cursor: pointer;" alt="Deactivate User" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}" data-extension="${extension}">
 									<i class="fa fa-plug" aria-hidden="true" style="color:#c31919;"></i>
 								</span>
 								`; // "Deactivate" | "Editing" | "reSync Password"
 				break;
 			case 2:
-				statusElement = `<span class="detachUser" alt="Remove from user" style="cursor:pointer;" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}"><i class="fa fa-eraser" aria-hidden="true"></i></span>`;
+				statusElement = `<span class="detachUser" title="Remove user" alt="Remove from user" style="cursor:pointer;" data-id="${id}" data-userid="${other?.userid || ''}" data-branch="${branchid}"><i class="fa fa-eraser" aria-hidden="true"></i></span>`;
 				break;
 		}
 
@@ -3388,6 +3409,7 @@ echo '</style>';
 					} else {
 						$('#not_exist_organization_note').fadeIn(300);
 						$('#not_exist_organization').fadeIn(300);
+						$('#not_exist_organization_limited').fadeIn(300);
 					}
 				}, 300);
 
@@ -3862,7 +3884,26 @@ echo '</style>';
 		const orgid = $('#email_for_reset_password').attr('data-orgid') || ORG_ID;
 		const id = $('#email_for_reset_password').attr('data-id');
 		const email = $('#email_for_reset_password').val();
-		resetPassword({ extension, orgid, id, email });
+		// confirm first (the reset modal is closed so the confirmation is not stacked on top of it)
+		$('#resetPasswordModal').modal('hide');
+		const confirmed = await confirmRingotelAction({
+			title: 'Reset password',
+			message: `Reset the Ringotel password of extension <b>${escapeText(extension)}</b>?<br>The app is signed out on every device and new provisioning instructions are sent to <b>${escapeText(email)}</b>.`,
+			confirmLabel: 'Reset password'
+		});
+		if (!confirmed) return;
+		// the reset modal was closed (its hidden handler blanked the form), so re-open it with the email filled in
+		// and run the reset once it is visible again: the success card with the QR code is rendered into its body
+		const reopenAndReset = () => {
+			$('#email_for_reset_password').val(email).attr('data-id', id).attr('data-extension', extension).attr('data-orgid', orgid);
+			$('#resetPasswordModal').one('shown.bs.modal', () => resetPassword({ extension, orgid, id, email })).modal('show');
+		};
+		// wait for the confirmation dialog to finish fading out (it stays :visible until then), otherwise Bootstrap drops the body "modal-open" state
+		if ($('#ringotelConfirmModal').is(':visible')) {
+			$('#ringotelConfirmModal').one('hidden.bs.modal', reopenAndReset);
+		} else {
+			reopenAndReset();
+		}
 		// } else {
 		// 	$('#email_for_reset_password').addClass('alert-danger');
 		// 	$('#reset_user_password_button').attr('disabled', true);
@@ -4536,8 +4577,15 @@ echo '</style>';
 		// clear event listeners
 		$('.deactivateUser').off('click');
 		// Bind Event Listener [Delete User]
-		$(".deactivateUser").on('click', (function (el) {
+		$(".deactivateUser").on('click', (async function (el) {
 			const id = el.currentTarget.getAttribute('data-id');
+			const confirmNumber = $('#user_card_' + id).attr('data-number') || '';
+			const confirmed = await confirmRingotelAction({
+				title: 'Disable extension',
+				message: `Disable extension <b>${escapeText(confirmNumber)}</b> in Ringotel?<br>The user is signed out of the Ringotel app on every device and can no longer use it until the extension is activated again.`,
+				confirmLabel: 'Disable'
+			});
+			if (!confirmed) return;
 			$(el.currentTarget).children('i').css('animation', 'plug 3s infinite');
 
 			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;

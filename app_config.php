@@ -55,6 +55,18 @@
 	$y++;
 	$apps[$x]['permissions'][$y]['name'] = "ringotel_extension_delete";
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_extension_manage";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_organization_view";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_connection_view";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_park_view";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 
     //default settings
     $y=0;
