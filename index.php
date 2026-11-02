@@ -35,6 +35,11 @@ require_once "resources/check_auth.php";
 require_once "resources/paging.php";
 require_once "resources/header.php";
 
+//white label name shown in place of "Ringotel", also the browser tab title
+$settings = new settings(["domain_uuid" => $_SESSION['domain_uuid'], "user_uuid" => $_SESSION['user_uuid']]);
+$display_name = trim((string)$settings->get('ringotel', 'display_name', 'Ringotel')) ?: 'Ringotel';
+$document['title'] = $display_name;
+
 //check the permissions
 if (!(permission_exists("ringotel") || if_group("superadmin"))) {
 	echo "access denied";
@@ -96,12 +101,6 @@ function get_less_than_30($str, $prefix)
 		return $str;
 	}
 }
-
-//define the settings object
-$settings = new settings(["domain_uuid" => $_SESSION['domain_uuid'], "user_uuid" => $_SESSION['user_uuid']]);
-
-//white label name shown in place of "Ringotel"
-$display_name = trim((string)$settings->get('ringotel', 'display_name', 'Ringotel')) ?: 'Ringotel';
 
 //lookup the domain description to default the Ringotel organization name
 $default_org_name = $_SESSION['domain_name'];
