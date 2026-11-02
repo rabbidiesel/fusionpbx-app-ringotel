@@ -1,28 +1,26 @@
-
 <?php
+/*
+	Ringotel column and delete button for the FusionPBX extensions list.
+	Included at the end of app/extensions/extensions.php, which app_defaults.php
+	(or resources/extensions_hook.php) adds and puts back after FusionPBX updates.
+*/
 
-// The Ringotel Checker
-if (!permission_exists("extension_ringotel")) {
-    $reject_ringotel = false;
-} else {
-    $reject_ringotel = true;
-    if (!empty($_GET['show']) && $_GET['show'] == "all") {
-        $reject_ringotel = false;
-    }
+//only for users who may see it, and not on the all domains view (the organization is per domain)
+	if (!permission_exists("extension_ringotel") || (!empty($_GET['show']) && $_GET['show'] == "all")) {
+		return;
+	}
 
-    // string to inject to DOM-elements
-    $target_id = 'extension_ringotel';
-    $target_header = 'Context';
+//white label name
+	$ringotel_display_name = 'Ringotel';
+	if (isset($settings) && $settings instanceof settings) {
+		$ringotel_display_name = trim((string)$settings->get('ringotel', 'display_name', 'Ringotel')) ?: 'Ringotel';
+	}
 
-    // table head
-    $table_head = "<table style='display: none;'><tr>";
-    $table_head .= "<th id='" . $target_id . "'>";
-    $table_head .= "Ringotel";
-    $table_head .= "</th></tr></table>";
+//the delete button also removes the user from Ringotel, so it needs the Ringotel delete permission
+	$ringotel_can_delete = permission_exists("ringotel_extension_delete") || if_group("superadmin");
 
-    // render elements (they will be relocated)
-    echo $table_head;
-}
+//the column head, moved into the table by the script below
+	echo "<table style='display: none;'><tr><th id='extension_ringotel'>" . escape($ringotel_display_name) . "</th></tr></table>\n";
 
 echo "<style>";
 echo "    .ringotel_info {";
@@ -108,264 +106,186 @@ echo "    	text-align: center;";
 echo "    	display: inline-block;";
 echo "    }";
 echo "</style>";
+
 ?>
 <script>
-    // if we have a table
-    // the method and target to inject
-    if ('<?php echo boolval($reject_ringotel) ?>') {
+(function () {
+    const target_id = 'extension_ringotel';
+    const service_url = '<?php echo PROJECT_PATH; ?>/app/ringotel/service.php?method=';
+    const display_name = <?php echo json_encode($ringotel_display_name); ?>;
+    const can_delete = <?php echo $ringotel_can_delete ? 'true' : 'false'; ?>;
 
-        const getOrganizationId = async () => await $.ajax({
-        		url: "/app/<?php echo $application_directory; ?>/service.php?method=get_organization",
-        		type: "get",
-        		cache: true
-            }).then((response) => {
-        		const { result } = JSON.parse(response.replaceAll("\\", ""));
-                return result?.id;
-            });
-        
-        const getRingotelUsers = async (orgid) => 
-            await $.ajax({
-        		url: "/app/<?php echo $application_directory; ?>/service.php?method=get_users",
-        		type: "get",
-        		cache: true,
-        		data: {
-        			orgid,
-        		}
-        	}).then((response) => {
-        		const { result } = JSON.parse(response.replaceAll("\\", ""));
-                return result;
-        	});
-        
-        
-        function showExtPopover(event) {
-            const popover = event.currentTarget.querySelector('.popover-content');
-            popover.style.display = 'flex';
-        };
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-        function hideExtPopover(event) {
-            const popover = event.currentTarget.querySelector('.popover-content');
-            popover.style.display = 'none';
-        };
+    const getOrganizationId = async () => await $.ajax({
+            url: service_url + 'get_organization',
+            type: "get",
+            cache: true
+        }).then((response) => {
+            const { result } = JSON.parse(response.replaceAll("\\", ""));
+            return result?.id;
+        });
 
-        const initRingotelExtensions = async () => {
+    const getRingotelUsers = async (orgid) => await $.ajax({
+            url: service_url + 'get_users',
+            type: "get",
+            cache: true,
+            data: { orgid }
+        }).then((response) => {
+            const { result } = JSON.parse(response.replaceAll("\\", ""));
+            return result;
+        });
 
-            // Inject The Column Head
-            const headings = document.evaluate('//th[contains(., "<?php echo $target_header ?>")]', document, null, XPathResult.ANY_TYPE, null);
-            const thisHeading = headings.iterateNext();
-            thisHeading.before(document.getElementById('<?php echo $target_id; ?>'));
-            const shift = [...document.getElementById('<?php echo $target_id; ?>').parentNode.children].map((el, k) => {
-                if (el.id == '<?php echo $target_id; ?>') {
-                    return k;
-                }
-            }).filter(el => el)[0];
-        
-            // Loading For Rows For Current Column
-            [...document.getElementById('<?php echo $target_id; ?>').parentNode.parentNode.children].map((td, k) => {
-                    if (k != 0) {
-                        document.getElementById('<?php echo $target_id ?>_'+k)?.parentNode.remove();
-                        const default_f = '<td><div id="<?php echo $target_id ?>_'+k+'" style="margin-left:2rem;"><i class="fas fa-spinner spinner_sync"></i></div></td>';
-                        td.children[shift - 1].insertAdjacentHTML('afterend', default_f);
-                    }
-                });
+    window.showExtPopover = function (event) {
+        event.currentTarget.querySelector('.popover-content').style.display = 'flex';
+    };
 
-            // Get Organization For Current Domain
+    window.hideExtPopover = function (event) {
+        event.currentTarget.querySelector('.popover-content').style.display = 'none';
+    };
+
+    //find the column to insert in front of: "Enabled" is always shown (the "Context" column is superadmin only)
+    const findAnchorHeading = () => {
+        const enabled = document.querySelector("th a[href*='order_by=enabled']")?.closest('th');
+        if (enabled) return enabled;
+        const context = document.querySelector("th a[href*='order_by=user_context']")?.closest('th');
+        if (context) return context;
+        return null;
+    };
+
+    //one cell per extension row
+    const fillCells = (rows, shift, render) => {
+        rows.forEach((tr, k) => {
+            if (k == 0) return;
+            document.getElementById(target_id + '_' + k)?.parentNode.remove();
+            tr.children[shift - 1]?.insertAdjacentHTML('afterend', render(tr, k));
+        });
+    };
+
+    const indicator = (k, css) => '<td><div class="' + css + '" style="margin-left: 2rem;" id="' + target_id + '_' + k + '"></div></td>';
+
+    const userCell = (k, ext_data) => {
+        const line = (label, value) =>
+            '<div style="display: flex;flex-direction: row;align-items: center;">' +
+            '<div style="padding-right: 0.25rem;">' + label + ':</div><div>' + escapeHtml(value) + '</div></div>';
+        let popover = line('Username', ext_data.username || '-') + line('Type', ext_data.type);
+        if (ext_data?.info?.email) popover += line('Email', ext_data.info.email);
+        if (Array.isArray(ext_data?.devs)) {
+            for (const device of ext_data.devs) {
+                if (device?.ua) popover += line('Device', device.ua);
+                if (device?.ip) popover += line('IP', device.ip);
+            }
+        }
+        return '<td>' +
+            '<div class="ringotel_info popover-div" onmouseover="showExtPopover(event)" onmouseout="hideExtPopover(event)" id="' + target_id + '_' + k + '">' +
+            '<i class="fa fa-info-circle indicator-green" aria-hidden="true" style="color: rgb(64 217 88);box-shadow:none;"></i>' +
+            '<div class="popover-content">' + popover + '</div>' +
+            '<div style="text-align: center;margin-left: 0.2rem;" class="ringotel_app" data-id="' + escapeHtml(ext_data.id) + '" data-org-id="' + escapeHtml(ext_data.orgid) + '" data-branch-id="' + escapeHtml(ext_data.branchid) + '">' +
+            escapeHtml(ext_data?.name || ext_data?.username) +
+            '</div></div></td>';
+    };
+
+    const initRingotelExtensions = async () => {
+        const column = document.getElementById(target_id);
+        const anchor = findAnchorHeading();
+        if (!column || !anchor) {
+            console.warn(display_name + ': extensions list column not added, the table header was not found');
+            return;
+        }
+
+        //insert the column head
+        anchor.before(column);
+        const shift = [...column.parentNode.children].indexOf(column);
+        const rows = [...column.parentNode.parentNode.children];
+
+        //loading spinners
+        fillCells(rows, shift, (tr, k) => '<td><div id="' + target_id + '_' + k + '" style="margin-left:2rem;"><i class="fas fa-spinner spinner_sync"></i></div></td>');
+
+        //get the users of the organization for this domain
+        let extensions = [];
+        try {
             const orgId = await getOrganizationId();
-            let extensions = [];
             if (orgId) {
-                // Get Ringotel Users for Current Domain
-	            let parksUserExtensions = await getRingotelUsers(orgId);
-                // Split
-	        	const regexp = /[\+*]/; // Parks param detect
-                // Prepare
-	        	extensions = parksUserExtensions.map((ext) => {
-                    const extension = {};
-                    if (ext.extension.match(regexp)) {
-                        extension.type = 'park';
-                    }
-                    if ((!ext.extension.match(regexp) && ext.status === 1)) {
-                        extension.type = 'user';
-                    }
-                    if ((!ext.extension.match(regexp) && ext.status !== 1)) {
-                        extension.type = 'extension';
-                    }
-                    extension['orgid'] = orgId || null;
-                    extension['id'] = ext?.id || null;
-                    extension['branchid'] = ext?.branchid || null;
-                    extension['extension'] = ext?.extension || null;
-                    extension['name'] = ext?.name || null;
-                    extension['username'] = ext?.name || null;
-                    extension['extension_exists'] = ext?.extension_exists || null;
-                    extension['devs'] = ext?.devs || null;
-                    extension['info'] = ext?.info || null;
-                
-                    return extension;
-                });
-            } else {
-                [...document.getElementById('<?php echo $target_id; ?>').parentNode.parentNode.children].map((td, k) => {
-                    if (k != 0) {
-                        document.getElementById('<?php echo $target_id ?>_'+k)?.parentNode.remove();
-                        const default_f = '<td><div class="indicator-red" style="margin-left: 2rem;" id="<?php echo $target_id ?>_'+k+'" ></div></td>';
-                        td.children[shift - 1].insertAdjacentHTML('afterend', default_f);
-                    }
-                });
+                const regexp = /[\+*]/; //parks
+                const users = await getRingotelUsers(orgId);
+                extensions = (Array.isArray(users) ? users : []).map((ext) => ({
+                    type: ext.extension.match(regexp) ? 'park' : (ext.status === 1 ? 'user' : 'extension'),
+                    orgid: orgId || null,
+                    id: ext?.id || null,
+                    branchid: ext?.branchid || null,
+                    extension: ext?.extension || null,
+                    name: ext?.name || null,
+                    username: ext?.name || null,
+                    devs: ext?.devs || null,
+                    info: ext?.info || null
+                }));
             }
-
-            if (Array.isArray(extensions) && extensions?.length > 0) {
-                [...document.getElementById('<?php echo $target_id; ?>').parentNode.parentNode.children].map((tr, k) => {
-                    if (k != 0) {
-                        document.getElementById('<?php echo $target_id ?>_'+k)?.parentNode.remove();
-                        const ext_ = tr?.querySelector('td a')?.innerText;
-                        const ext_data = extensions?.find(({ extension }) => extension == ext_);
-
-                        if (ext_data && ext_data?.type == 'user') {
-                            let ext_f  = '<td>';
-                                ext_f += '  <div class="ringotel_info popover-div" onmouseover="showExtPopover(event)" onmouseout="hideExtPopover(event)"  id="<?php echo $target_id ?>_'+k+'">';
-                                ext_f += '      <i class="fa fa-info-circle indicator-green " aria-hidden="true" id="<?php echo $target_id ?>_popup_'+k+'" style="color: rgb(64 217 88);box-shadow:none;">';
-                                ext_f += '      </i>';
-                                ext_f += '          <div class="popover-content">';
-                                ext_f += '              <div style="display: flex;flex-direction: row;align-items: center;">';
-                                ext_f += '                   <div style="padding-right: 0.25rem;">Username:</div>';
-                                ext_f += '                   <div>'+(ext_data.username||'-')+'</div>';
-                                ext_f += '              </div>';
-                                ext_f += '              <div style="display: flex;flex-direction: row;align-items: center;">';
-                                ext_f += '                   <div style="padding-right: 0.25rem;">Type:</div>';
-                                ext_f += '                   <div>'+ext_data.type+'</div>';
-                                ext_f += '              </div>';
-                                if (ext_data?.info?.email) {
-                                    ext_f += '              <div style="display: flex;flex-direction: row;align-items: center;">';
-                                    ext_f += '                   <div style="padding-right: 0.25rem;">Email:</div>';
-                                    ext_f += '                   <div>'+ext_data.info.email+'</div>';
-                                    ext_f += '              </div>';  
-                                }
-                                if (Array.isArray(ext_data?.devs)) {
-                                    for (device of ext_data.devs) {
-                                        if (device?.ua) {
-                                            ext_f += '              <div style="display: flex;flex-direction: row;align-items: center;">';
-                                            ext_f += '                   <div style="padding-right: 0.25rem;">Device:</div>';
-                                            ext_f += '                   <div>'+device.ua+'</div>';
-                                            ext_f += '              </div>';
-                                        }
-                                        if (device?.ip) {
-                                            ext_f += '              <div style="display: flex;flex-direction: row;align-items: center;">';
-                                            ext_f += '                   <div style="padding-right: 0.25rem;">IP:</div>';
-                                            ext_f += '                   <div>'+device.ip+'</div>';
-                                            ext_f += '              </div>';
-                                        }
-                                    };  
-                                }
-                                ext_f += '          </div>';
-                                ext_f += `      <div style="text-align: center;margin-left: 0.2rem;" class="ringotel_app" data-id="${ext_data.id}" data-org-id="${ext_data.orgid}" data-branch-id="${ext_data.branchid}">`;
-                                ext_f +=            (ext_data?.name||ext_data?.username)
-                                ext_f += '      </div>';
-                                ext_f += '  </div>';
-                                ext_f += '</td>';
-                            tr.children[shift - 1].insertAdjacentHTML('afterend', ext_f);
-                        } else {
-                            let default_f  = '<td>';
-                                default_f += `  <div class="${ext_data?.type == 'extension' ? 'indicator-yellow' : 'indicator-red'}" style="margin-left: 2rem;" id="<?php echo $target_id ?>_`+k+`"></div>`;
-                                default_f += '</td>';
-                            tr.children[shift - 1].insertAdjacentHTML('afterend', default_f);
-                        }
-                    }
-                });
-            } else {
-                [...document.getElementById('<?php echo $target_id; ?>').parentNode.parentNode.children].map((td, k) => {
-                    if (k != 0) {
-                        document.getElementById('<?php echo $target_id ?>_'+k)?.parentNode.remove();
-                        const default_f = '<td><div class="indicator-red" style="margin-left: 2rem;" id="<?php echo $target_id ?>_'+k+'"></div></td>';
-                        td.children[shift - 1].insertAdjacentHTML('afterend', default_f);
-                    }
-                });
-            }
+        } catch (error) {
+            console.error(display_name + ': could not load the users', error);
         }
 
-        // init column
-        initRingotelExtensions();
+        fillCells(rows, shift, (tr, k) => {
+            const ext_ = tr?.querySelector('td a')?.innerText;
+            const ext_data = extensions.find(({ extension }) => extension == ext_);
+            if (ext_data?.type == 'user') return userCell(k, ext_data);
+            return indicator(k, ext_data?.type == 'extension' ? 'indicator-yellow' : 'indicator-red');
+        });
+    };
 
-        ////////////////////////////////////
-        /// Delete Users For Ringotel ///
-        ///////////////////////////////////
+    initRingotelExtensions();
 
-        // Function to make an async AJAX request
-        function deleteUserRequest(orgid, userId) {
-            return new Promise((resolve, reject) => {
-                $.ajax({
-				    url: "/app/<?php echo $application_directory; ?>/service.php?method=delete_user",
-				    type: "get",
-				    cache: true,
-				    data: {
-				    	id: userId,
-				    	orgid: orgid
-				    },
-                    success: function(data) {
-                        resolve(data);
-                    },
-                    error: function(error) {
-                        reject(error);
-                    }
-                });
+    //delete: remove the selected extensions from Ringotel first, then delete the extensions and voicemail
+    const deleteUserRequest = (orgid, userId) => $.ajax({
+            url: service_url + 'delete_user',
+            type: "get",
+            cache: true,
+            data: { id: userId, orgid: orgid }
+        });
+
+    window.deleteTheAppExt = function () {
+        const button = document.getElementById('delete_app_button');
+        const usersData = [];
+        document.querySelectorAll("#form_list input[type='checkbox']:checked").forEach((input) => {
+            const app = input.closest('tr')?.querySelector('.ringotel_app');
+            if (app) {
+                usersData.push({ orgid: app.getAttribute('data-org-id'), userId: app.getAttribute('data-id') });
+            }
+        });
+
+        const deleteExtensions = () => {
+            modal_close();
+            list_action_set('delete_extension_voicemail');
+            list_form_submit('form_list');
+        };
+
+        if (usersData.length == 0) {
+            deleteExtensions();
+            return;
+        }
+
+        const label = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner spinner_sync" style="margin-right: 0.4rem;"></i>Deleting';
+        Promise.all(usersData.map(({ orgid, userId }) => deleteUserRequest(orgid, userId)))
+            .then(deleteExtensions)
+            .catch((error) => {
+                console.error(display_name + ': delete failed', error);
+                button.disabled = false;
+                button.innerHTML = label;
+                alert('The users could not be removed from ' + display_name + '. Nothing was deleted.');
             });
-        }
+    };
 
-        // Delete Functional For Ringotel
-        function deleteTheAppExt() {
-            // modal_close(); list_action_set('delete_extension'); list_form_submit('form_list');
-            var	checked = false;
-            var inputs = document.getElementsByTagName('input');
-            var usersData = []; 
-            for (var i = 0, max = inputs.length; i < max; i++) {
-            	if (inputs[i].type === 'checkbox' && inputs[i].checked == true && Boolean(inputs[i].parentNode.className.indexOf('switch'))) {
-            		checked = true;
-                    const ringotelExtAppElement = inputs[i].parentNode.parentNode.querySelector('.ringotel_app');
-
-                    if (ringotelExtAppElement) {
-			            const userId = ringotelExtAppElement.getAttribute('data-id');
-			            const orgid = ringotelExtAppElement.getAttribute('data-org-id');
-                        usersData.push({ orgid, userId });
-                    }
-            	}
-            }
-
-            // Deleting Spinner
-            document.getElementById('delete_app_button').innerHTML = '';
-            document.getElementById('delete_app_button').insertAdjacentHTML('beforeend', '<i class="fas fa-spinner spinner_sync" style="margin-right: 0.4rem;"></i>DELETEING');
-
-            // Array to store promises for each AJAX request
-            const requestPromises = usersData.map(({ orgid, userId }) => deleteUserRequest(orgid, userId));
-
-            if (Array.isArray(requestPromises) && requestPromises?.length > 0) {
-                Promise.all(requestPromises)
-                    .then(results => {
-                        list_action_set('delete_extension_voicemail'); 
-                        list_form_submit('form_list');
-                    })
-                    .catch(error => {
-                        console.error('Error fetching data:', error);
-                    });
-            } else {
-                modal_close(); 
-                list_action_set('delete_extension_voicemail'); 
-                list_form_submit('form_list');
-            }
-        }
-
-
-        // Delete Element Button
-        const button_delete_app_ext = `<?php echo button::create(['type'=>'button','id'=> 'delete_app_button', 'label'=>'Extension & VM & App','icon'=>'user','collapse'=>'never','style'=>'float: right; margin-left: 15px;','onclick'=>"deleteTheAppExt();"]) ?>`;
-
-        const deleteElementModalAction = document.getElementById('modal-delete-options')?.querySelector('.modal-actions');
-
-        // Inject the New Button
-        deleteElementModalAction?.insertAdjacentHTML('afterbegin', button_delete_app_ext);
-
-        // CSS Style @Media Injection
+    //the extra button in the delete dialog (only shown when the user may delete voicemail too)
+    const deleteModalActions = document.getElementById('modal-delete-options')?.querySelector('.modal-actions');
+    if (can_delete && deleteModalActions) {
+        deleteModalActions.insertAdjacentHTML('afterbegin', <?php echo json_encode(button::create(['type'=>'button','id'=>'delete_app_button','label'=>'Extension, VM & '.$ringotel_display_name,'icon'=>'user','collapse'=>'never','style'=>'float: right; margin-left: 15px;','onclick'=>"deleteTheAppExt();"])); ?>);
         if (window.matchMedia("(min-width: 700px)").matches) {
-            if (document.getElementById('modal-delete-options')?.querySelector('.modal-window > div')?.style) {
-                document.getElementById('modal-delete-options').querySelector('.modal-window > div').style.width = '600px';
-            }
+            const modal_window = document.getElementById('modal-delete-options').querySelector('.modal-window > div');
+            if (modal_window) modal_window.style.width = '600px';
         }
-
     }
-
-
+})();
 </script>

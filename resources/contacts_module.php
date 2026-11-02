@@ -9,13 +9,9 @@
 
     Included by index.php: as the Contacts tab, or as the only content for users
     who hold "ringotel_contacts" but not "ringotel_extensions".
-    Requires: $application_directory. Self-contained: does not depend on the
+    Self-contained: does not depend on the
     JavaScript of index.php, and resolves the organization on the server side.
 */
-
-if (!isset($application_directory)) {
-	$application_directory = pathinfo(__DIR__ . '/..')['basename'];
-}
 
 echo '<style>';
 echo "	#contacts_module > div:first-child { flex-wrap: wrap; gap: 0.25rem 0.5rem; }";
@@ -94,7 +90,7 @@ echo '		</div>';
 
 	let CONTACTS = [];
 	const SELECTED_CONTACTS = new Set();
-	const CONTACTS_SERVICE = "/app/<?php echo $application_directory; ?>/service.php?method=";
+	const CONTACTS_SERVICE = "/app/ringotel/service.php?method=";
 	const CONTACTS_BATCH_SIZE = 40; // contacts per request for bulk import / update (keeps requests well under PHP input limits)
 	const CONTACT_LIST_FIELDS = ['mobile', 'phone', 'fax', 'email'];
 	const CONTACT_TEXT_FIELDS = ['organization', 'position', 'department', 'about'];

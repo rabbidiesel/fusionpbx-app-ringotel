@@ -51,9 +51,6 @@ function sanitize_input($value) {
     }
 }
 
-//get the application directory
-$application_directory = pathinfo(__dir__)['basename'];
-
 // Function for define and sanitize QUERY-params
 // ...simple adding the others method for sanitazing
 $queryParams = [];

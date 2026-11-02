@@ -13,17 +13,17 @@ php /var/www/fusionpbx/core/upgrade/upgrade.php --permissions
 php /var/www/fusionpbx/core/upgrade/upgrade.php
 ```
 
-**Customize the display name** (Change `<Your Display Name>` and `<your-folder-name>`to what you want it to be):
-```
-sed -i "s/\$apps\[\$x\]\['name'\] = \"Ringotel\";/\$apps\[\$x\]\['name'\] = \"<Your Display Name>\";/" /var/www/fusionpbx/app/<your-folder-name>/app_config.php
-```
+The app must be installed in `app/ringotel`. The upgrade's App Defaults step (included in the full upgrade above) also adds the Ringotel column to the extensions list, see section 2.
 
-Optional: Ringotel could be installed into a different directory such as rt.
-```
-git clone https://github.com/fusionpbx/fusionpbx-app-ringotel.git rt
-git config --global --add safe.directory /var/www/fusionpbx/app/rt
-```
-The menu would need to edited to use the custom directory name.
+**White label / display name**
+
+The folder stays `ringotel`; the name users see comes from one setting:
+- Default Settings
+  - Category: ringotel
+  - Subcategory: display_name
+  - Value: the name to show, for example `My Softphone` (default `Ringotel`)
+
+It is used on the app page, for the column on the extensions list and for the delete button there. It can also be set per domain in Domain Settings. The menu title is taken from it when the menu is restored (`upgrade.php --menu`); to rename the menu item of an existing install without restoring the whole menu, use Advanced -> Menu Manager.
 
 **Ringotel Website**
 - Menu -> Integrations -> API Settings
@@ -70,11 +70,23 @@ This streamlines user management for those using both FusionPBX and Ringotel.
 
 This feature adds a "Ringotel status of user" column to FusionPBX's `extensions.php` page.
 
-To enable it, **append the following line** to your `extension.php` file (typically in `app/extensions/`):
+It also adds an **Extension, VM & Ringotel** button to the delete dialog, which removes the selected users from Ringotel before deleting the extensions and their voicemail. The button needs the `ringotel_extension_delete` permission.
+
+FusionPBX has no hook for this page, so the app adds these lines in front of the footer of `app/extensions/extensions.php`:
 ```
-    //include the ringotel extension list
-    require_once dirname(__DIR__, 2)."/app/ringotel/ringotel_extension_list.php";
+	//ringotel: column and delete button on the extensions list (added by app/ringotel, safe to remove)
+	if (file_exists(dirname(__DIR__, 2)."/app/ringotel/ringotel_extension_list.php")) {
+		require_once dirname(__DIR__, 2)."/app/ringotel/ringotel_extension_list.php";
+	}
 ```
+A FusionPBX update replaces `extensions.php`; the App Defaults upgrade puts the lines back. To check, add or remove them without an upgrade:
+```
+php /var/www/fusionpbx/app/ringotel/resources/extensions_hook.php status
+php /var/www/fusionpbx/app/ringotel/resources/extensions_hook.php install
+php /var/www/fusionpbx/app/ringotel/resources/extensions_hook.php remove
+```
+The lines check that the app is there, so removing the app does not break the extensions page.
+
 ![ringotel_extension_list](https://github.com/user-attachments/assets/be0f82c7-8696-402a-ab2c-6a99d7af0282)
 
 The new column will display statuses and user's information providing quick insight into each extension's Ringotel integration.

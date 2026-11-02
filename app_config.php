@@ -197,5 +197,13 @@
     $apps[$x]['default_settings'][$y]['default_setting_value'] = "";
     $apps[$x]['default_settings'][$y]['default_setting_enabled'] = "false";
     $apps[$x]['default_settings'][$y]['default_setting_description'] = "Should be used as a domain setting ONLY -  DO NOT enable this in Default Settings";
+    $y++;
+    $apps[$x]['default_settings'][$y]['default_setting_uuid'] = "f8205bf8-5405-474b-adb0-1726c1e3cef2";
+    $apps[$x]['default_settings'][$y]['default_setting_category'] = "ringotel";
+    $apps[$x]['default_settings'][$y]['default_setting_subcategory'] = "display_name";
+    $apps[$x]['default_settings'][$y]['default_setting_name'] = "text";
+    $apps[$x]['default_settings'][$y]['default_setting_value'] = "Ringotel";
+    $apps[$x]['default_settings'][$y]['default_setting_enabled'] = "true";
+    $apps[$x]['default_settings'][$y]['default_setting_description'] = "White label name shown on the page, the extensions list and the delete button. A menu restore uses it for the menu title; to rename an existing menu item use Menu Manager.";
 
 ?>
