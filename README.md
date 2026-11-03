@@ -72,6 +72,8 @@ This streamlines user management for those using both FusionPBX and Ringotel.
 
 This feature adds a "Ringotel status of user" column to FusionPBX's `extensions.php` page.
 
+Extensions that are not in Ringotel yet (red) get an envelope button: it adds the extension to Ringotel as an active user and Ringotel emails the welcome instructions (app download and login). The address is prefilled from the voicemail email; with more than one connection you pick one. It needs `ringotel_extension_add` and `ringotel_extension_manage`. Everything after that (resend, reset password, disable) is done in the app.
+
 It also adds an **Extension, VM & Ringotel** button to the delete dialog, which removes the selected users from Ringotel before deleting the extensions and their voicemail. The button needs the `ringotel_extension_delete` permission.
 
 FusionPBX has no hook for this page, so the app adds these lines in front of the footer of `app/extensions/extensions.php`:

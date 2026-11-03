@@ -1,8 +1,8 @@
 <?php
 /*
-	Ringotel column and delete button for the FusionPBX extensions list.
+	Ringotel column, welcome email for new extensions and delete button for the FusionPBX extensions list.
 	Included at the end of app/extensions/extensions.php, which app_defaults.php
-	(or resources/extensions_hook.php) adds and puts back after FusionPBX updates.
+	(or resources/hooks.php) adds and puts back after FusionPBX updates.
 */
 
 //only for users who may see it, and not on the all domains view (the organization is per domain)
@@ -18,6 +18,36 @@
 
 //the delete button also removes the user from Ringotel, so it needs the Ringotel delete permission
 	$ringotel_can_delete = permission_exists("ringotel_extension_delete") || if_group("superadmin");
+
+//welcome email: creates a new extension in Ringotel and activates it, which sends the welcome email (managing existing users stays in the app)
+	$ringotel_can_welcome = (permission_exists("ringotel_extension_add") && permission_exists("ringotel_extension_manage")) || if_group("superadmin");
+
+//voicemail email per extension, to prefill the welcome email address
+	$ringotel_voicemail_emails = [];
+	if ($ringotel_can_welcome) {
+		$ringotel_rows = (new database)->select("select voicemail_id, voicemail_mail_to from v_voicemails where domain_uuid = :domain_uuid", ['domain_uuid' => $_SESSION['domain_uuid']], 'all');
+		foreach ((is_array($ringotel_rows) ? $ringotel_rows : []) as $ringotel_row) {
+			$ringotel_email = trim(explode(',', (string)$ringotel_row['voicemail_mail_to'])[0]);
+			if ($ringotel_email != '') {
+				$ringotel_voicemail_emails[$ringotel_row['voicemail_id']] = $ringotel_email;
+			}
+		}
+		unset($ringotel_rows, $ringotel_row, $ringotel_email);
+
+		//the dialog
+		echo modal::create([
+			'id' => 'modal-ringotel-welcome',
+			'title' => 'Send welcome email',
+			'message' =>
+				"<div id='ringotel_welcome_text' style='margin-bottom: 15px;'></div>".
+				"<input type='email' class='formfld' id='ringotel_welcome_email' placeholder='Email address' style='width: 100%; margin-bottom: 10px;'>".
+				"<select class='formfld' id='ringotel_welcome_branch' style='width: 100%; display: none;'></select>".
+				"<div id='ringotel_welcome_error' style='color: #c00; margin-top: 10px; display: none;'></div>",
+			'actions' =>
+				button::create(['type'=>'button','label'=>$text['button-cancel'] ?? 'Cancel','icon'=>$settings->get('theme', 'button_icon_cancel'),'collapse'=>'hide-xs','onclick'=>'modal_close();']).
+				button::create(['type'=>'button','id'=>'ringotel_welcome_send','label'=>'Send','icon'=>'envelope','collapse'=>'never','style'=>'float: right;','onclick'=>"ringotelWelcomeSend();"])
+		]);
+	}
 
 //the column head, moved into the table by the script below
 	echo "<table style='display: none;'><tr><th id='extension_ringotel'>" . escape($ringotel_display_name) . "</th></tr></table>\n";
@@ -114,18 +144,21 @@ echo "</style>";
     const service_url = '<?php echo PROJECT_PATH; ?>/app/ringotel/service.php?method=';
     const display_name = <?php echo json_encode($ringotel_display_name); ?>;
     const can_delete = <?php echo $ringotel_can_delete ? 'true' : 'false'; ?>;
+    const can_welcome = <?php echo $ringotel_can_welcome ? 'true' : 'false'; ?>;
+    const voicemail_emails = <?php echo json_encode((object)$ringotel_voicemail_emails); ?>;
+    let organization = null; //{ id, domain } of the Ringotel organization of this domain
 
     const escapeHtml = (value) => String(value ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-    const getOrganizationId = async () => await $.ajax({
+    const getOrganization = async () => await $.ajax({
             url: service_url + 'get_organization',
             type: "get",
             cache: true
         }).then((response) => {
             const { result } = JSON.parse(response.replaceAll("\\", ""));
-            return result?.id;
+            return result?.id ? { id: result.id, domain: result.domain } : null;
         });
 
     const getRingotelUsers = async (orgid) => await $.ajax({
@@ -165,6 +198,20 @@ echo "</style>";
     };
 
     const indicator = (k, css) => '<td><div class="' + css + '" style="margin-left: 2rem;" id="' + target_id + '_' + k + '"></div></td>';
+
+    //new extension (not in Ringotel yet): red indicator plus the welcome email button
+    const newExtensionCell = (k, tr) => {
+        const extension = tr?.querySelector('td a')?.innerText?.trim();
+        const uuid = tr.querySelector("input[name$='[uuid]']")?.value || new URLSearchParams((tr.getAttribute('href') || '').split('?')[1] || '').get('id');
+        if (!can_welcome || !organization || !extension || !uuid) return indicator(k, 'indicator-red');
+        return '<td><div id="' + target_id + '_' + k + '" style="margin-left: 2rem; display: flex; align-items: center;">' +
+            '<div class="indicator-red"></div>' +
+            '<i class="fas fa-envelope ringotel_welcome" style="margin-left: 0.6rem; cursor: pointer; color: #2196f3;"' +
+            ' title="Add to ' + escapeHtml(display_name) + ' and send the welcome email"' +
+            ' data-extension="' + escapeHtml(extension) + '" data-uuid="' + escapeHtml(uuid) + '"' +
+            ' onclick="event.stopPropagation(); ringotelWelcomeOpen(this);"></i>' +
+            '</div></td>';
+    };
 
     const userCell = (k, ext_data) => {
         const line = (label, value) =>
@@ -206,7 +253,8 @@ echo "</style>";
         //get the users of the organization for this domain
         let extensions = [];
         try {
-            const orgId = await getOrganizationId();
+            organization = await getOrganization();
+            const orgId = organization?.id;
             if (orgId) {
                 const regexp = /[\+*]/; //parks
                 const users = await getRingotelUsers(orgId);
@@ -230,11 +278,97 @@ echo "</style>";
             const ext_ = tr?.querySelector('td a')?.innerText;
             const ext_data = extensions.find(({ extension }) => extension == ext_);
             if (ext_data?.type == 'user') return userCell(k, ext_data);
+            if (!ext_data) return newExtensionCell(k, tr);
             return indicator(k, ext_data?.type == 'extension' ? 'indicator-yellow' : 'indicator-red');
         });
     };
 
     initRingotelExtensions();
+
+    //welcome email: create the extension in Ringotel as an active user, Ringotel then emails the welcome / provisioning instructions
+    let welcome_target = null;
+    let branches = null;
+
+    const getBranches = async () => {
+        if (branches) return branches;
+        const response = await $.ajax({ url: service_url + 'get_branches', type: "get", cache: true, data: { orgid: organization.id } });
+        const { result } = JSON.parse(response.replaceAll("\\", ""));
+        branches = Array.isArray(result) ? result : [];
+        return branches;
+    };
+
+    const welcomeError = (message) => {
+        const element = document.getElementById('ringotel_welcome_error');
+        element.textContent = message || '';
+        element.style.display = message ? 'block' : 'none';
+    };
+
+    window.ringotelWelcomeOpen = async function (icon) {
+        welcome_target = { extension: icon.getAttribute('data-extension'), uuid: icon.getAttribute('data-uuid') };
+        document.getElementById('ringotel_welcome_text').innerHTML =
+            'Add extension <b>' + escapeHtml(welcome_target.extension) + '</b> to ' + escapeHtml(display_name) +
+            ' and email the welcome instructions (app download and login) to:';
+        document.getElementById('ringotel_welcome_email').value = voicemail_emails[welcome_target.extension] || '';
+        document.getElementById('ringotel_welcome_send').disabled = false;
+        welcomeError('');
+        modal_open('modal-ringotel-welcome', 'ringotel_welcome_email');
+
+        //connections: pick one when there is more than one
+        const select = document.getElementById('ringotel_welcome_branch');
+        try {
+            const list = await getBranches();
+            select.innerHTML = list.map((branch) =>
+                '<option value="' + escapeHtml(branch.id) + '" data-name="' + escapeHtml(branch.name) + '">' +
+                escapeHtml(branch.name) + (branch.address ? ' - ' + escapeHtml(branch.address) : '') + '</option>').join('');
+            select.style.display = list.length > 1 ? 'block' : 'none';
+            if (list.length == 0) welcomeError('There is no connection in ' + display_name + ' yet. Create one in the app first.');
+        } catch (error) {
+            console.error(display_name + ': could not load the connections', error);
+            welcomeError('The connections could not be loaded.');
+        }
+    };
+
+    window.ringotelWelcomeSend = function () {
+        const email = document.getElementById('ringotel_welcome_email').value.trim();
+        const branch = document.getElementById('ringotel_welcome_branch').selectedOptions[0];
+        if (!welcome_target) return;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            welcomeError('Enter the email address the welcome email goes to.');
+            return;
+        }
+        if (!branch) {
+            welcomeError('There is no connection to add the extension to.');
+            return;
+        }
+        const button = document.getElementById('ringotel_welcome_send');
+        button.disabled = true;
+        welcomeError('');
+        $.ajax({
+            url: service_url + 'create_users',
+            type: "post",
+            cache: true,
+            data: {
+                orgid: organization.id,
+                orgdomain: organization.domain,
+                branchid: branch.value,
+                branchname: branch.getAttribute('data-name'),
+                preusers: [{ extension_uuid: welcome_target.uuid, create: 'true', active: 'true', email: email }]
+            }
+        }).then((response) => {
+            let res = null;
+            try { res = JSON.parse(response.replaceAll("\\", "")); } catch (e) { }
+            if (!res || res.success === false || res.error) {
+                const detail = res?.data ?? res?.error;
+                throw new Error(typeof detail == 'object' && detail ? (detail.message || JSON.stringify(detail)) : (detail || 'Unexpected response'));
+            }
+            modal_close();
+            initRingotelExtensions();
+        }).catch((error) => {
+            console.error(display_name + ': welcome email failed', error);
+            button.disabled = false;
+            welcomeError('The extension could not be added: ' + (error?.message || error?.statusText || 'unknown error'));
+        });
+    };
 
     //delete: remove the selected extensions from Ringotel first, then delete the extensions and voicemail
     const deleteUserRequest = (orgid, userId) => $.ajax({
