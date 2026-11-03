@@ -205,5 +205,13 @@
     $apps[$x]['default_settings'][$y]['default_setting_value'] = "Ringotel";
     $apps[$x]['default_settings'][$y]['default_setting_enabled'] = "true";
     $apps[$x]['default_settings'][$y]['default_setting_description'] = "White label name shown on the page, the extensions list and the delete button. A menu restore uses it for the menu title; to rename an existing menu item use Menu Manager.";
+    $y++;
+    $apps[$x]['default_settings'][$y]['default_setting_uuid'] = "92a5f449-d1fd-4a6b-b002-5c532754cbef";
+    $apps[$x]['default_settings'][$y]['default_setting_category'] = "ringotel";
+    $apps[$x]['default_settings'][$y]['default_setting_subcategory'] = "url_alias";
+    $apps[$x]['default_settings'][$y]['default_setting_name'] = "text";
+    $apps[$x]['default_settings'][$y]['default_setting_value'] = "";
+    $apps[$x]['default_settings'][$y]['default_setting_enabled'] = "true";
+    $apps[$x]['default_settings'][$y]['default_setting_description'] = "White label address: with a name such as my-app the page is also at /app/my-app/index.php. Applied by App Defaults or resources/hooks.php; point the menu item at the new address.";
 
 ?>

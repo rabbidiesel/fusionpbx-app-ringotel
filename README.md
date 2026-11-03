@@ -23,7 +23,9 @@ The folder stays `ringotel`; the name users see comes from one setting:
   - Subcategory: display_name
   - Value: the name to show, for example `My Softphone` (default `Ringotel`)
 
-It is used on the app page, for the column on the extensions list and for the delete button there. It can also be set per domain in Domain Settings. The menu title is taken from it when the menu is restored (`upgrade.php --menu`); to rename the menu item of an existing install without restoring the whole menu, use Advanced -> Menu Manager.
+It is used on the app page and browser tab, for the column on the extensions list and for the delete button there. It can also be set per domain in Domain Settings. The menu title is taken from it when the menu is restored (`upgrade.php --menu`); to rename the menu item of an existing install without restoring the whole menu, use Advanced -> Menu Manager.
+
+To also hide `ringotel` in the address bar, set **ringotel > url_alias** (for example `my-app`, letters, digits, `-` and `_`). The App Defaults upgrade, or `php /var/www/fusionpbx/app/ringotel/resources/hooks.php install`, then creates `app/my-app/index.php`, a one line page that loads `app/ringotel/index.php`. Point the menu item at `/app/my-app/index.php` in Menu Manager (a menu restore uses the alias by itself). Changing the alias removes the old address; the app only touches folders it created itself.
 
 **Ringotel Website**
 - Menu -> Integrations -> API Settings
@@ -81,9 +83,9 @@ FusionPBX has no hook for this page, so the app adds these lines in front of the
 ```
 A FusionPBX update replaces `extensions.php`; the App Defaults upgrade puts the lines back. To check, add or remove them without an upgrade:
 ```
-php /var/www/fusionpbx/app/ringotel/resources/extensions_hook.php status
-php /var/www/fusionpbx/app/ringotel/resources/extensions_hook.php install
-php /var/www/fusionpbx/app/ringotel/resources/extensions_hook.php remove
+php /var/www/fusionpbx/app/ringotel/resources/hooks.php status
+php /var/www/fusionpbx/app/ringotel/resources/hooks.php install
+php /var/www/fusionpbx/app/ringotel/resources/hooks.php remove
 ```
 The lines check that the app is there, so removing the app does not break the extensions page.
 
