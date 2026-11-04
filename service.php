@@ -176,10 +176,10 @@ if (!empty($integration)) {
     $ringotel_api_functions = new ringotel_api_functions($settings, $ringotel_api_url, null, null);
     $ringotel = new ringotel($settings, $ringotel_api_functions);
 
-    //only a superadmin may work on another domain's organization: the organization id sent by the page must be this domain's
+    //only a superadmin may work on another domain's organization: an organization id sent by the page must be this domain's (an empty one falls back to it)
     if (!if_group('superadmin')) {
         unset($queryParams['domain_name']);
-        if ($object_method != 'get_organization' && isset($queryParams['orgid'])) {
+        if ($object_method != 'get_organization' && !empty($queryParams['orgid'])) {
             $domain_organization = $ringotel->get_organization([]);
             if (empty($domain_organization['result']['id']) || (string)$domain_organization['result']['id'] !== (string)$queryParams['orgid']) {
                 echo json_encode(array('success' => false, 'data' => 'access denied: that organization does not belong to this domain'));
