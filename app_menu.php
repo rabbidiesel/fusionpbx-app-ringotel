@@ -32,6 +32,6 @@ $apps[$x]['menu'][0]['parent_uuid'] = "fd29e39c-c936-f5fc-8e2b-611681b266b5";
 $apps[$x]['menu'][0]['category'] = "internal";
 $apps[$x]['menu'][0]['path'] = "/app/" . (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $ringotel_url_alias) ? $ringotel_url_alias : "ringotel") . "/index.php";
 $apps[$x]['menu'][0]['groups'][] = "superadmin";
-// $apps[$x]['menu'][0]['groups'][] = "admin";
+$apps[$x]['menu'][0]['groups'][] = "admin";
 
 ?>

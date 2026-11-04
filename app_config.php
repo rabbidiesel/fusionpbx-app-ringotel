@@ -46,6 +46,7 @@
 	$y++;
 	$apps[$x]['permissions'][$y]['name'] = "ringotel_contacts";
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$apps[$x]['permissions'][$y]['groups'][] = "admin";
 	$y++;
 	$apps[$x]['permissions'][$y]['name'] = "ringotel_extension_add";
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
