@@ -20,7 +20,7 @@
 	$ringotel_can_delete = permission_exists("ringotel_extension_delete") || if_group("superadmin");
 
 //welcome email: creates a new extension in Ringotel and activates it, which sends the welcome email (managing existing users stays in the app)
-	$ringotel_can_welcome = (permission_exists("ringotel_extension_add") && permission_exists("ringotel_extension_manage")) || if_group("superadmin");
+	$ringotel_can_welcome = (permission_exists("ringotel_extension_add") && permission_exists("ringotel_extension_manage")) || permission_exists("ringotel_extension_welcome") || if_group("superadmin");
 
 //voicemail email per extension, to prefill the welcome email address
 	$ringotel_voicemail_emails = [];

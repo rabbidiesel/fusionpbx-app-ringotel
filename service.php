@@ -77,6 +77,9 @@ $object_method = $queryParams['method'];
 //   Everything else needs "ringotel_extensions" (view) plus, for changes, one of
 //   "ringotel_extension_add", "ringotel_extension_edit", "ringotel_extension_manage"
 //   (activate / disable, resync, reset password) or "ringotel_extension_delete".
+//   "ringotel_extension_welcome" (send the welcome email to a new extension from the extensions list) and
+//   "ringotel_extension_password" (reset password) are the narrow versions given to admins; the calls they
+//   allow are limited further below.
 // A method listed with several permissions is allowed when the user holds any of them
 // (the "apply default settings" calls run right after creating an organization or connection).
 $contact_methods = ['get_contacts', 'create_contact', 'update_contact', 'delete_contact', 'import_contacts', 'update_contacts'];
@@ -87,20 +90,20 @@ $method_permissions = [
     // add
     'create_organization' => ['ringotel_extension_add'],
     'create_branch' => ['ringotel_extension_add'],
-    'create_users' => ['ringotel_extension_add'],
+    'create_users' => ['ringotel_extension_add', 'ringotel_extension_welcome'],
     'create_integration' => ['ringotel_extension_add'],
     'create_sms_trunk' => ['ringotel_extension_add'],
     'update_organization_with_default_settings' => ['ringotel_extension_add', 'ringotel_extension_edit'],
     'update_branch_with_default_settings' => ['ringotel_extension_add', 'ringotel_extension_edit'],
     // edit
-    'update_user' => ['ringotel_extension_edit', 'ringotel_extension_manage'], // also used by the reset password flow
+    'update_user' => ['ringotel_extension_edit', 'ringotel_extension_manage', 'ringotel_extension_password'], // also used by the reset password flow
     'update_extension_name' => ['ringotel_extension_edit'],
     // manage (activate / disable, resync, reset password)
     'resync_names' => ['ringotel_extension_manage'],
     'resync_password' => ['ringotel_extension_manage'],
     'activate_user' => ['ringotel_extension_manage'],
     'deactivate_user' => ['ringotel_extension_manage'],
-    'reset_user_password' => ['ringotel_extension_manage'],
+    'reset_user_password' => ['ringotel_extension_manage', 'ringotel_extension_password'],
     'update_branch_with_updated_settings' => ['ringotel_extension_edit'],
     'update_parks_with_updated_settings' => ['ringotel_extension_edit'],
     'switch_organization_mode' => ['ringotel_extension_edit'],
@@ -130,6 +133,21 @@ if (!if_group('superadmin')) {
     } else {
         $allowed = false;
     }
+    //welcome only: every new user is created active with an email, which is what sends the welcome email
+    if ($allowed && $object_method == 'create_users' && !permission_exists('ringotel_extension_add')) {
+        $preusers = $queryParams['preusers'] ?? null;
+        $allowed = is_array($preusers) && !empty($preusers);
+        foreach ($allowed ? $preusers : [] as $item) {
+            if (($item['create'] ?? '') !== 'true' || ($item['active'] ?? '') !== 'true' || !filter_var($item['email'] ?? '', FILTER_VALIDATE_EMAIL)) {
+                $allowed = false;
+            }
+        }
+    }
+    //reset password only: update_user may only set the email and activate (the reset flow), not rename
+    if ($allowed && $object_method == 'update_user' && !permission_exists('ringotel_extension_edit') && !permission_exists('ringotel_extension_manage')) {
+        unset($queryParams['name']);
+        $queryParams['status'] = 1;
+    }
     if (!$allowed) {
         echo json_encode(array('success' => false, 'data' => 'access denied: you do not have permission for this action'));
         exit;
@@ -157,6 +175,18 @@ if (!empty($integration)) {
     $ringotel_api_url = $settings->get('ringotel', 'ringotel_api', $integration);
     $ringotel_api_functions = new ringotel_api_functions($settings, $ringotel_api_url, null, null);
     $ringotel = new ringotel($settings, $ringotel_api_functions);
+
+    //only a superadmin may work on another domain's organization: the organization id sent by the page must be this domain's
+    if (!if_group('superadmin')) {
+        unset($queryParams['domain_name']);
+        if ($object_method != 'get_organization' && isset($queryParams['orgid'])) {
+            $domain_organization = $ringotel->get_organization([]);
+            if (empty($domain_organization['result']['id']) || (string)$domain_organization['result']['id'] !== (string)$queryParams['orgid']) {
+                echo json_encode(array('success' => false, 'data' => 'access denied: that organization does not belong to this domain'));
+                exit;
+            }
+        }
+    }
     if (method_exists($ringotel, $object_method)) {
         $output_format_converter = new ringotel_response_output_converter();
         echo $output_format_converter->associative_array_to_json($ringotel->{$object_method}($queryParams));

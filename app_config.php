@@ -60,6 +60,14 @@
 	$apps[$x]['permissions'][$y]['name'] = "ringotel_extension_manage";
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_extension_welcome";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$apps[$x]['permissions'][$y]['groups'][] = "admin";
+	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_extension_password";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$apps[$x]['permissions'][$y]['groups'][] = "admin";
+	$y++;
 	$apps[$x]['permissions'][$y]['name'] = "ringotel_organization_view";
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 	$y++;

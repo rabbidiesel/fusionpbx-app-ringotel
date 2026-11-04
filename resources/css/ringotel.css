@@ -424,7 +424,7 @@
 	body.ringotel-no-edit #parks_update, body.ringotel-no-edit #parks_save, body.ringotel-no-edit .sms_trunk_save,
 	body.ringotel-no-edit #packageid_switcher_container { display: none !important; }
 	body.ringotel-no-manage .reSyncAllNames, body.ringotel-no-manage .reSyncAllPassword, body.ringotel-no-manage .reSyncPassword,
-	body.ringotel-no-manage .resetPassword, body.ringotel-no-manage .activateUser, body.ringotel-no-manage .deactivateUser { display: none !important; }
+	body.ringotel-no-password .resetPassword, body.ringotel-no-manage .activateUser, body.ringotel-no-manage .deactivateUser { display: none !important; }
 	body.ringotel-no-delete #delete_organization, body.ringotel-no-delete .delete_connect, body.ringotel-no-delete .delete_user,
 	body.ringotel-no-delete .detachUser, body.ringotel-no-delete .sms_trunk_delete, body.ringotel-no-delete #manageNumbersModalDisable { display: none !important; }
 	body.ringotel-no-edit.ringotel-no-delete .options_user, body.ringotel-no-edit.ringotel-no-delete .user_card_options { display: none !important; }
