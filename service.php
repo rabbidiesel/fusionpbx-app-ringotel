@@ -79,7 +79,7 @@ $object_method = $queryParams['method'];
 //   (activate / disable, resync, reset password) or "ringotel_extension_delete".
 //   "ringotel_extension_welcome" (send the welcome email to a new extension from the extensions list) and
 //   "ringotel_extension_password" (reset password) are the narrow versions given to admins; the calls they
-//   allow are limited further below.
+//   allow are limited further below. "ringotel_sms_number_users" only changes the users of an existing SMS number.
 // A method listed with several permissions is allowed when the user holds any of them
 // (the "apply default settings" calls run right after creating an organization or connection).
 $contact_methods = ['get_contacts', 'create_contact', 'update_contact', 'delete_contact', 'import_contacts', 'update_contacts'];
@@ -108,7 +108,7 @@ $method_permissions = [
     'update_branch_with_updated_settings' => ['ringotel_extension_edit'],
     'update_parks_with_updated_settings' => ['ringotel_extension_edit'],
     'switch_organization_mode' => ['ringotel_extension_edit'],
-    'update_sms_trunk' => ['ringotel_extension_edit'],
+    'update_sms_trunk' => ['ringotel_extension_edit', 'ringotel_sms_number_users'],
     // delete
     'delete_organization' => ['ringotel_extension_delete'],
     'delete_branch' => ['ringotel_extension_delete'],
@@ -188,6 +188,24 @@ if (!empty($integration)) {
                 echo json_encode(array('success' => false, 'data' => 'access denied: that organization does not belong to this domain'));
                 exit;
             }
+        }
+
+        //users of an SMS number only: everything but the users is taken from the stored number configuration
+        if ($object_method == 'update_sms_trunk' && !permission_exists('ringotel_extension_edit')) {
+            $stored = null;
+            $trunks = $ringotel->get_sms_trunk(['orgid' => $queryParams['orgid'] ?? '']);
+            foreach ((is_array($trunks['result'] ?? null) ? $trunks['result'] : []) as $trunk) {
+                if ((string)($trunk['id'] ?? '') === (string)($queryParams['id'] ?? '')) {
+                    $stored = $trunk;
+                }
+            }
+            if ($stored === null) {
+                echo json_encode(array('success' => false, 'data' => 'access denied: SMS number not found'));
+                exit;
+            }
+            $queryParams['name'] = $stored['name'] ?? '';
+            $queryParams['number'] = (string)($stored['number'] ?? '');
+            $queryParams['service'] = $stored['service'] ?? '';
         }
     }
     if (method_exists($ringotel, $object_method)) {

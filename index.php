@@ -78,6 +78,7 @@ if (!$can_edit) { $body_classes[] = 'ringotel-no-edit'; }
 if (!$can_delete) { $body_classes[] = 'ringotel-no-delete'; }
 if (!$can_manage) { $body_classes[] = 'ringotel-no-manage'; }
 if (!($can_manage || permission_exists("ringotel_extension_password"))) { $body_classes[] = 'ringotel-no-password'; }
+if (!($can_edit || permission_exists("ringotel_sms_number_users"))) { $body_classes[] = 'ringotel-no-sms-users'; }
 if (!$can_view_organization) { $body_classes[] = 'ringotel-no-organization'; }
 if (!$can_view_connections) { $body_classes[] = 'ringotel-no-connections'; }
 if (!$can_view_parks) { $body_classes[] = 'ringotel-no-parks'; }

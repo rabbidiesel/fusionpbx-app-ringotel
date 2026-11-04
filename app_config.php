@@ -68,6 +68,10 @@
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 	$apps[$x]['permissions'][$y]['groups'][] = "admin";
 	$y++;
+	$apps[$x]['permissions'][$y]['name'] = "ringotel_sms_number_users";
+	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+	$apps[$x]['permissions'][$y]['groups'][] = "admin";
+	$y++;
 	$apps[$x]['permissions'][$y]['name'] = "ringotel_organization_view";
 	$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 	$y++;

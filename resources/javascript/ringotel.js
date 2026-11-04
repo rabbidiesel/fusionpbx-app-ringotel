@@ -899,41 +899,40 @@
 		});
 	}
 
-	// The SMS providers card: one row per provider that is set up in the default settings or connected in Ringotel
+	// The SMS providers bar (one chip per provider that is set up or connected) and the numbers header
 	const IntegrationElement = (providers) => {
-		const rows = providers.map((p) => {
+		const chips = providers.map((p) => {
 			const connected = p.state === 1;
-			const logo = p.logo ? `<img src="${escapeText(p.logo)}" alt="" style="width: 1.6rem;margin-right: 0.6rem;">` : '';
-			const status = connected
-				? '<span style="color: #4caf50;font-size: 10pt;margin-left: 10px;"><i class="fa fa-circle" aria-hidden="true"></i> Connected</span>'
-				: '<span style="color: #9e9e9e;font-size: 10pt;margin-left: 10px;"><i class="fa fa-circle" aria-hidden="true"></i> Not connected</span>';
-			const button = connected
-				? `<button class="btn btn-outline-danger integration_disconnect" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}" style="font-size: 9pt;padding: 0px 10px;margin-left: auto;height: 22px;">Disconnect</button>`
+			const logo = p.logo ? `<img src="${escapeText(p.logo)}" alt="">` : '<i class="fa fa-comment" aria-hidden="true"></i>';
+			const action = connected
+				? `<button class="btn btn-link btn-sm integration_disconnect" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}">Disconnect</button>`
 				: (p.configured
-					? `<button class="btn btn-primary integration_create" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}" style="font-size: 9pt;padding: 0px 10px;margin-left: auto;height: 22px;"><span class="integration_button_text">Connect</span><span class="integration_button_loading" style="display: none;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Connecting...</span></button>`
-					: '<span style="margin-left: auto;font-size: 9pt;color: #9e9e9e;">Not set up in Default Settings</span>');
+					? `<button class="btn btn-primary btn-sm integration_create" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}"><span class="integration_button_text">Connect</span><span class="integration_button_loading" style="display: none;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Connecting...</span></button>`
+					: '<span class="rt-sms-muted">Not set up</span>');
 			const webhook = connected && p.webhook
-				? `<div style="font-size: 9pt;color: #666;margin: 4px 0 0 2.2rem;word-break: break-all;">Inbound SMS webhook to set at ${escapeText(p.name)}: <code>${escapeText(p.webhook)}</code></div>`
+				? `<button class="btn btn-link btn-sm rt-sms-webhook" data-webhook="${escapeText(p.webhook)}" title="Copy the inbound SMS webhook to set at ${escapeText(p.name)}"><i class="fa fa-link" aria-hidden="true"></i> Webhook</button>`
 				: '';
-			return `<div class="integration_provider" data-service="${escapeText(p.id)}" style="padding: 8px 0;border-bottom: 1px solid #eee;">
-						<div style="display: flex;align-items: center;">${logo}<b style="font-size: 12pt;">${escapeText(p.name)}</b>${status}${button}</div>
-						${webhook}
+			return `<div class="rt-sms-provider-chip ${connected ? 'connected' : ''}" data-service="${escapeText(p.id)}">
+						<span class="rt-sms-provider-logo">${logo}</span>
+						<span class="rt-sms-provider-name">${escapeText(p.name)}</span>
+						<span class="rt-sms-status">${connected ? 'Connected' : 'Not connected'}</span>
+						${webhook}${action}
 					</div>`;
 		}).join('');
 		const any_connected = providers.some((p) => p.state === 1);
-		return `<div class="card" id="integration_service" style="width: 32rem;max-width: 100%;display:none;">
-				  <div class="card-body card-body-p">
-					<h5 class="card-title" style="font-size: 17pt;font-weight: 700;">SMS providers</h5>
-					${rows}
-					<p class="card-text" style="font-size: 11pt;margin-top: 12px;">${any_connected ? 'Add numbers from a connected provider and allocate users who will be able to send/receive SMS.' : 'Connect a provider to add numbers.'}</p>
-					${any_connected ? '<button id="manageNumbersModal_button" class="btn btn-primary" data-toggle="modal" data-target="#manageNumbersModal">Manage numbers</button>' : ''}
-				  </div>
+		return `<div id="integration_service" class="rt-sms" style="display:none;">
+					<div class="rt-sms-section-title">SMS providers</div>
+					<div class="rt-sms-providers">${chips}</div>
+					${any_connected ? `<div class="rt-sms-numbers-head">
+						<div class="rt-sms-section-title">Numbers <span id="rt_sms_numbers_count" class="rt-sms-count">0</span></div>
+						<button id="manageNumbersModal_button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#manageNumbersModal"><i class="fa fa-plus" aria-hidden="true"></i> Add number</button>
+					</div>` : '<div class="rt-sms-empty-list">Connect a provider to add SMS numbers.</div>'}
 				</div>
 				`;
 	}
 
 	const integrationServiceContainerElement = () => {
-		return `<div id="integration_service_container" style="display:none;"><div>`
+		return `<div id="integration_service_container" class="rt-sms-list"></div>`
 	}
 
 	const MembersIntegrationModalelement = (providers) => {
@@ -941,7 +940,7 @@
 					  <div class="modal-dialog modal-dialog-centered" role="document" id="manageNumbersModal_modal_body">
 							<div class="modal-content">
 								<div class="modal-header">
-									<h5 class="modal-title" id="manageNumbersModalLabel">Manage Numbers</h5>
+									<h5 class="modal-title" id="manageNumbersModalLabel">Add SMS number</h5>
 									<button type="button" class="close" data-dismiss="modal" aria-label="Close">
 										  <span aria-hidden="true">&times;</span>
 									</button>
@@ -1011,335 +1010,199 @@
 				</div>`;
 	}
 
-	// Templater for GET SMS TRUNK
+	// (212) 555-1234
+	const prettyNumber = (number) => {
+		const d = tenDigits(number);
+		return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : escapeText(number || '-');
+	};
+
+	// one SMS number: name, number, provider, settings line, users; editing happens in place
 	const elementSMSTrunk = (data, parksUserExtensions) => {
-		// console.log('[elementSMSTrunk --------> data', data);
-		// console.log('[elementSMSTrunk --------> parksUserExtensions', parksUserExtensions);
-
-		const users_elements = data?.users.map((id) => {
-			const user = parksUserExtensions?.filter((item) => item.id === id)[0];
-			return (
-				`<div data-id="${user?.id}" style="background: #a1a1a1;padding: 0px 10px;font-size: 11pt;border-radius: 10px;color: white;margin: 5px 7px;">${user?.name} (${user?.extension})</div>`
-			);
+		const users = (data?.users || []).map((id) => {
+			const user = parksUserExtensions?.find((item) => item.id === id);
+			return user
+				? `<span class="rt-sms-user" data-id="${escapeText(id)}">${escapeText(user.name)} <small>${escapeText(user.extension)}</small></span>`
+				: `<span class="rt-sms-user rt-sms-user-unknown" data-id="${escapeText(id)}">Unknown user</span>`;
 		}).join('');
-
-		return `<div id="sms_trunk_${data.id}" data-service="${escapeText(data?.service || 'Bandwidth')}" data-number="${escapeText(data?.number || '')}" class="card mb-3" style="height: 232px;max-width: 100%;margin: 10px 0px;box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.06) 0px 2px 4px -1px;">
-					  <div class="row no-gutters">
-						<div class="col-md-5">
-							<div class="card-body card-body-p">
-								<h5    	id="table_sms_trunk_name_h5_${data.id}" class="card-title" style="font-size: 20pt;font-weight: 700;">${data?.name || '-'}</h5>
-								<input 	id="table_sms_trunk_name_input_${data.id}" class="card-title" style="font-size: 20pt;font-weight: 700;display:none;font-size: 20pt;font-weight: 700;margin: 0;padding: 0px 10px;line-height: normal;border-radius: 10px;border: 1px solid #8080804f;" value="${data?.name || ''}"/>
-								<table 	id="table_sms_trunk_${data.id}"    data-id="${data.id}" class="table table table-hover table-borderless" style="margin-bottom: 1rem;">
-								  <tbody>
-									<tr>
-										<td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Number:</td>
-										<td id="table_sms_trunk_number_td_${data.id}" name="table_sms_trunk_number_td" class="table_sms_trunk_number_td" style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">
-											${data?.number || '-'}
-										</td>
-										<td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;display:none;">
-											<input type="number" id="table_sms_trunk_number_input_${data.id}" name="table_sms_trunk_number_input" class="table_sms_trunk_number_input" style="padding: 0;margin: 0;width: inherit;border: 1px solid #837e7e52;padding: 0px 4px;border-radius: 20px;" value="${data?.number?.replace('+1', '') || ''}"/>
-										</td>
-									</tr>
-									<tr>
-										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Provider:</td>
-										  <td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">${escapeText(data?.service || '-')}</td>
-									</tr>
-									<tr>
-										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Country:</td>
-										  <td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">${data?.country || '-'}</td>
-									</tr>
-									<tr>
-										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Reformat outbound:</td>
-										  <td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">${data?.outboundFormat || '-'}</td>
-									</tr>
-									<tr>
-										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Reformat inbound:</td>
-										  <td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">${data?.inboundFormat || '-'}</td>
-									</tr>
-									<tr>
-										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">10DLC Opt-Out:</td>
-										  <td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">${data?.optout?.autoreply && data?.optout?.keyword ? 'Enabled' : 'Disabled'}</td>
-									</tr>
-								  </tbody>
-								</table>
-							</div>
+		const details = [
+			escapeText(data?.country || 'US'),
+			`Outbound ${escapeText(data?.outboundFormat || '-')}`,
+			`Inbound ${escapeText(data?.inboundFormat || '-')}`,
+			`Opt-out ${data?.optout?.autoreply && data?.optout?.keyword ? 'on' : 'off'}`
+		].join(' &middot; ');
+		return `<div id="sms_trunk_${data.id}" class="rt-sms-number" data-id="${data.id}" data-service="${escapeText(data?.service || 'Bandwidth')}" data-number="${escapeText(data?.number || '')}" data-name="${escapeText(data?.name || '')}">
+					<div class="rt-sms-number-head">
+						<div class="rt-sms-number-title">
+							<span class="rt-sms-number-digits">${prettyNumber(data?.number)}</span>
+							<span id="table_sms_trunk_name_h5_${data.id}" class="rt-sms-number-name">${escapeText(data?.name || '')}</span>
+							<input id="table_sms_trunk_name_input_${data.id}" class="form-control form-control-sm rt-sms-name-input" style="display: none;" value="${escapeText(data?.name || '')}" placeholder="Name">
+							<span class="rt-sms-provider">${escapeText(data?.service || '-')}</span>
 						</div>
-						<div class="col-md-7">
-							  <div class="card-body card-body-p">
-									<h5 class="card-title">Users</h5>
-									<div id="table_sms_trunk_users_${data.id}" class="table_sms_trunk_users" data-id="${data.id}" style="display: flex;flex-wrap: wrap;">
-										${users_elements}
-									</div>
-									<select id="table_sms_trunk_manage_users_${data.id}" style="height: 125px; overflow: hidden; display: none;" name="table_sms_trunk_manage_users" multiple="" multiselect-hide-x="true" type="text" class="form-control" placeholder="Who will be sending and receiving SMS via this phone number"></select>
-							  </div>
+						<div class="rt-sms-actions">
+							<button id="sms_trunk_update_${data.id}" class="btn btn-sm btn-outline-primary sms_trunk_update" data-id="${data.id}"><i class="fa fa-users" aria-hidden="true"></i> Edit users</button>
+							<button id="sms_trunk_delete_${data.id}" class="btn btn-sm btn-outline-danger sms_trunk_delete" data-id="${data.id}" data-number="${escapeText(data?.number || '')}" title="Delete number"><i class="fa fa-trash" aria-hidden="true"></i></button>
 						</div>
-					  </div>
-
-					<button id="sms_trunk_save_${data.id}" class="btn btn-outline-primary sms_trunk_save" data-id="${data.id}" 		style="border: 0px;padding: 2px 10px;margin: 10px;align-items: center;display: none;position: absolute;bottom: 10px;right: 130px;;font-size: 10pt;font-weight: 600;">
-						Save
-					</button>
-
-					<button id="sms_trunk_close_updating_${data.id}" class="btn btn-outline-primary sms_trunk_close_updating" data-id="${data.id}" 		style="display: none;border: 0px;padding: 2px 10px;margin: 10px;align-items: center;position: absolute;bottom: 10px;right: 40px;font-size: 10pt;font-weight: 600;color: gray;">
-						Close
-					</button>
-					  
-					<span id="sms_trunk_save_loading_${data.id}" style="border: 0px;padding: 2px 10px;margin: 10px;align-items: center;display: none;position: absolute;bottom: 10px;right: 100px;font-size: 10pt;font-weight: 600;">
-						<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-						Loading...	
-					</span>
-					  
-					<button id="sms_trunk_update_${data.id}" class="btn btn-outline-secondary sms_trunk_update" data-id="${data.id}" 	style="border: 0px;padding: 2px 10px;margin: 10px;align-items: center;display: flex;position: absolute;bottom: 10px;right: 100px;font-size: 10pt;font-weight: 600;">
-						Edit
-					</button>
-					  
-					<button id="sms_trunk_delete_${data.id}" class="btn btn-outline-danger sms_trunk_delete" data-id="${data.id}" data-number="${data?.number?.replace('+1', '') || ''}"	style="border: 0px;padding: 2px 10px;margin: 10px;align-items: center;display: flex;position: absolute;bottom: 10px;right: 10px;font-size: 10pt;font-weight: 600;">
-						Delete
-					</button>
+					</div>
+					<div class="rt-sms-details">${details}</div>
+					<div class="rt-sms-users-label">Users <span class="rt-sms-count">${(data?.users || []).length}</span></div>
+					<div id="table_sms_trunk_users_${data.id}" class="rt-sms-users table_sms_trunk_users" data-id="${data.id}">
+						${users || '<span class="rt-sms-empty">No users. Nobody can send or receive SMS on this number.</span>'}
+					</div>
+					<div id="sms_trunk_editor_${data.id}" class="rt-sms-editor" style="display: none;">
+						<select id="table_sms_trunk_manage_users_${data.id}" name="table_sms_trunk_manage_users" multiple="" multiselect-hide-x="true" class="form-control" placeholder="Who sends and receives SMS on this number"></select>
+						<div class="rt-sms-editor-buttons">
+							<button id="sms_trunk_close_updating_${data.id}" class="btn btn-sm btn-light sms_trunk_close_updating" data-id="${data.id}">Cancel</button>
+							<button id="sms_trunk_save_${data.id}" class="btn btn-sm btn-primary sms_trunk_save" data-id="${data.id}">
+								<span class="rt-sms-save-text">Save</span>
+								<span class="rt-sms-save-loading" style="display: none;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Saving...</span>
+							</button>
+						</div>
+					</div>
 				</div>`;
-	}
+	};
 
-	// SMS TRUNK SAVE EVENT 
+	// open / close the users editor of a number
+	const smsTrunkEditor = (id, open, users) => {
+		const can_rename = !$('body').hasClass('ringotel-no-edit');
+		if (open) {
+			const current = [...$('#table_sms_trunk_users_' + id).children('.rt-sms-user')].map((item) => item.getAttribute('data-id'));
+			$('#table_sms_trunk_manage_users_' + id).html(users.map((item) => `<option value="${escapeText(item.id)}">${escapeText(item.name)} (${escapeText(item.extension)})</option>`).join('')).val(current);
+			$('#sms_trunk_editor_' + id).find('#multiselect_dropdown').remove();
+			$('#table_sms_trunk_users_' + id).hide();
+			$('#sms_trunk_update_' + id).hide();
+			$('#sms_trunk_delete_' + id).hide();
+			if (can_rename) {
+				$('#table_sms_trunk_name_h5_' + id).hide();
+				$('#table_sms_trunk_name_input_' + id).show();
+			}
+			$('#sms_trunk_editor_' + id).show();
+			MultiSelectDropDownBindSelectors({ id: 'table_sms_trunk_manage_users_' + id, style: { height: 'auto', padding: '4px' } });
+		} else {
+			$('#sms_trunk_editor_' + id).hide().find('#multiselect_dropdown').remove();
+			$('#table_sms_trunk_name_input_' + id).hide().val($('#sms_trunk_' + id).attr('data-name'));
+			$('#table_sms_trunk_name_h5_' + id).show();
+			$('#table_sms_trunk_users_' + id).show();
+			$('#sms_trunk_update_' + id).show();
+			$('#sms_trunk_delete_' + id).css('display', '');
+		}
+	};
+
+	// SMS TRUNK SAVE EVENT
 	const eventSMSTrunkSave = () => {
-		// Disable sms trunk update
 		$('.sms_trunk_save').off('click');
-		// Enable sms trunk update
 		$('.sms_trunk_save').on('click', (function (e) {
-			const id = e.target.getAttribute('data-id');
-			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
-			// console.log('----> update sms trunk @id, @orgid ', id, orgid);
-
-			// Hide the save button
-			$('#sms_trunk_save_' + id).fadeOut(300);
-			$('#sms_trunk_close_updating_' + id).fadeOut(300);
-
-			// Disable Inputs
-			$('#table_sms_trunk_name_input_' + id).attr('disabled', true);
-			$('#table_sms_trunk_number_input_' + id).attr('disabled', true);
-			$('#table_sms_trunk_users_' + id).parent().children('.multiselect-dropdown').css('opacity', '0.5');
-			$('#table_sms_trunk_users_' + id).parent().children('.multiselect-dropdown').css('pointer-events', 'none');
-
-			// Get params for updating
-			const name = $('#table_sms_trunk_name_input_' + id).val();
-			const number = $('#sms_trunk_' + id).attr('data-number');
-			const users = $('#table_sms_trunk_manage_users_' + id).val();
-
-			// console.log('----> update sms trunk @name, @number, @users ', name, number, users);
-
-			const service = $('#sms_trunk_' + id).attr('data-service');
+			const button = $(e.currentTarget);
+			const id = button.attr('data-id');
+			const card = $('#sms_trunk_' + id);
 			const data = {
-				orgid,
+				orgid: $('#delete_organization').attr('data-account') || ORG_ID,
 				id,
-				name,
-				number,
-				users,
-				service
+				name: $('body').hasClass('ringotel-no-edit') ? card.attr('data-name') : $('#table_sms_trunk_name_input_' + id).val().trim(),
+				number: card.attr('data-number'),
+				users: $('#table_sms_trunk_manage_users_' + id).val() || [],
+				service: card.attr('data-service')
 			};
-			// console.log('[--------------eventSMSTrunkSave-------------] data', data);
-
-			setTimeout(() => {
-				// Show the save loading
-				$('#sms_trunk_save_loading_' + id).fadeIn(300);
-				// Create Ajax Funciton
-				$.ajax({
-					url: "/app/ringotel/service.php?method=update_sms_trunk",
-					type: "post",
-					cache: true,
-					data,
-					success: async function (response) {
-						checkErrors(response);
-
-						// re-Update Trunk
-						const parksUserExtensions = await getUsersWithUpdateElements(); // Get Users Again For Updating DOM and For SMS Trunk
-						getSMSTrunk(parksUserExtensions); // Get Numbers Configuration
-
-						$('#manage_numbers_activate_button').attr('disabled', false);
-						$('#manage_numbers_activate_text').slideDown(300);
-						$('#manage_numbers_activate_loading').slideUp(300);
-						$('#manageNumbersModal').click();
-
-						setTimeout(() => {
-							// Hide Loading
-							$('#sms_trunk_save_loading_' + id).fadeOut(300);
-							// AFTER Successful Ajax Request
-							$('#sms_trunk_delete_' + id).fadeIn(300);
-							$('#sms_trunk_update_' + id).fadeIn(300);
-							$('#sms_trunk_save_' + id).fadeOut(300);
-							$('#sms_trunk_close_updating_' + id).fadeOut(300);
-						}, 300);
-					},
-					error: function (jqXHR, textStatus, errorThrown) {
-						// console.log(textStatus, errorThrown);
-					}
-				});
-			}, 300);
-		}));
-	};
-
-	// SMS TRUNK CLOSE EVENT
-	const eventSMSTrunkClose = () => {
-		// Disable sms trunk update
-		$('.sms_trunk_close_updating').off('click');
-		// Enable sms trunk update
-		$('.sms_trunk_close_updating').on('click', (function (e) {
-			const id = e.target.getAttribute('data-id');
-			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
-			// console.log('----> close updating sms trunk @id, @orgid ', id, orgid);
-
-			// Show delete and Update
-			$('#sms_trunk_delete_' + id).fadeIn(300);
-			$('#sms_trunk_update_' + id).fadeIn(300);
-			// Hide Save and Close
-			$('#sms_trunk_save_' + id).fadeOut(300);
-			$('#sms_trunk_close_updating_' + id).fadeOut(300);
-
-			// Hide exist Input and Select elements
-			$('#table_sms_trunk_name_input_' + id).slideUp(300);											// Name input-Field
-			// $('#table_sms_trunk_number_input_'+id).parent().slideUp(300);									// Number input-Field (it is a parent because the input is inside of <td> tag)
-			$('#table_sms_trunk_manage_users_' + id).parent().children('#multiselect_dropdown').slideUp(300); // Users multi-Selector
-
-			// Switch to Text fields
-			setTimeout(() => {
-				$('#table_sms_trunk_name_h5_' + id).slideDown(300); 											// Name text-field
-				// $('#table_sms_trunk_number_td_'+id).slideDown(300);											// Number text-field
-				$('#table_sms_trunk_users_' + id).slideDown(300); 											// Users text-field
-				$('#table_sms_trunk_manage_users_' + id).parent().children('#multiselect_dropdown').remove(); // [clean] Users multi-selector
-			}, 300);
-		}));
-	};
-
-
-	// SMS TRUNK UPDATE EVENT
-	const eventSMSTrunkUpdate = (users) => {
-		// Disable sms trunk update
-		$('.sms_trunk_update').off('click');
-		// Enable sms trunk update
-		$('.sms_trunk_update').on('click', (function (e) {
-			const sms_trunk_id = e.target.getAttribute('data-id');
-			// console.log('----> update sms trunk @sms_trunk_id, @orgid ', sms_trunk_id);
-			// Hide Update and Delete
-			$('#sms_trunk_delete_' + sms_trunk_id).fadeOut(300);
-			$('#sms_trunk_update_' + sms_trunk_id).fadeOut(300);
-			// Show Save and Close
-			$('#sms_trunk_save_' + sms_trunk_id).fadeIn(300);
-			$('#sms_trunk_close_updating_' + sms_trunk_id).fadeIn(300);
-
-			// Enable Inputs
-			$('#table_sms_trunk_name_input_' + sms_trunk_id).attr('disabled', false);
-			// $('#table_sms_trunk_number_input_'+sms_trunk_id).attr('disabled', false);
-			$('#table_sms_trunk_users_' + sms_trunk_id).parent().children('.multiselect-dropdown').css('opacity', '1');
-			$('#table_sms_trunk_users_' + sms_trunk_id).parent().children('.multiselect-dropdown').css('pointer-events', '');
-
-			// Switch to editable field
-			$('#table_sms_trunk_name_h5_' + sms_trunk_id).slideUp(300); // Name field
-			// $('#table_sms_trunk_number_td_'+sms_trunk_id).slideUp(300); // Number field
-			$('#table_sms_trunk_users_' + sms_trunk_id).slideUp(300); // Users Field
-
-			// Add Users to Select List for SMS Trunk Update
-			$('#table_sms_trunk_manage_users_' + sms_trunk_id).html(users?.map((item) => {
-				return `<option value="${item?.id}">${item?.name} (${item?.extension})</option>`; // Add options to select field
-			}));
-
-			setTimeout(() => {
-				// Check exist values
-				const sms_trunks_users_ids = [...$('#table_sms_trunk_users_' + sms_trunk_id).children('div')].map((item) => item.getAttribute('data-id'));
-				// Set Up Cheked State for Users Selector
-				$('#table_sms_trunk_manage_users_' + sms_trunk_id).val(sms_trunks_users_ids);
-
-				// [SHOW] Switch to editable field
-				/**/$('#table_sms_trunk_name_input_' + sms_trunk_id).slideDown(300); /// Name field
-				// /**/$('#table_sms_trunk_number_input_'+sms_trunk_id).parent().slideDown(300); /// Number field
-				/**/$('#table_sms_trunk_manage_users_' + sms_trunk_id).parent().children('#multiselect_dropdown').remove(); /// Clear Select Field for Add Users Manage Members
-				/**/MultiSelectDropDownBindSelectors({ id: 'table_sms_trunk_manage_users_' + sms_trunk_id, style: { height: '125px' } }); /// Multi Values For Inputs (Just For Select Fields)
-			}, 300);
-		}));
-	};
-
-	// SMS TRUNK DELETE EVENT
-	const eventSMSTrunkDelete = () => {
-		// Disable sms trunk delete event
-		$('.sms_trunk_delete').off('click');
-		// Enable sms trunk delete event
-		$('.sms_trunk_delete').on('click', (function (e) {
-			$('#manageNumbersModal_button').attr('disabled', true);
-			const sms_trunk_id = e.target.getAttribute('data-id');
-			const sms_trunk_number = e.target.getAttribute('data-number');
-			const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
-			// console.log('sms_trunk_id', sms_trunk_id);
-
-			$('#sms_trunk_delete_' + sms_trunk_id).attr('disabled', true);
-
+			button.attr('disabled', true).children('.rt-sms-save-text').hide();
+			button.children('.rt-sms-save-loading').show();
 			$.ajax({
-				url: "/app/ringotel/service.php?method=delete_sms_trunk",
+				url: "/app/ringotel/service.php?method=update_sms_trunk",
 				type: "post",
-				cache: true,
-				data: { orgid, id: sms_trunk_id },
-				success: function (response) {
+				data,
+				success: async function (response) {
 					checkErrors(response);
-					// console.log('[eventSMSTrunkDelete] response', response);
-					// getIntegration();
-					$('#sms_trunk_' + sms_trunk_id).slideUp(300);
-
-					// console.log('[eventSMSTrunkDelete ---------> sms_trunk_number', sms_trunk_number);
-					// show number in options if we are managing numbers
-					sms_trunk_number && USED_SMS_NUMBERS.delete(tenDigits(sms_trunk_number));
-
-					setTimeout(() => {
-						// disable Button
-						$('#manageNumbersModal_button').attr('disabled', false);
-					}, 300);
+					const parksUserExtensions = await getUsersWithUpdateElements();
+					getSMSTrunk(parksUserExtensions);
 				},
-				error: function (jqXHR, textStatus, errorThrown) {
-					// console.log(textStatus, errorThrown);
+				error: function () {
+					button.attr('disabled', false).children('.rt-sms-save-loading').hide();
+					button.children('.rt-sms-save-text').show();
 				}
 			});
 		}));
 	};
 
+	// SMS TRUNK CLOSE EVENT
+	const eventSMSTrunkClose = () => {
+		$('.sms_trunk_close_updating').off('click');
+		$('.sms_trunk_close_updating').on('click', (function (e) {
+			smsTrunkEditor($(e.currentTarget).attr('data-id'), false);
+		}));
+	};
+
+	// SMS TRUNK UPDATE EVENT (open the users editor)
+	const eventSMSTrunkUpdate = (users) => {
+		$('.sms_trunk_update').off('click');
+		$('.sms_trunk_update').on('click', (function (e) {
+			smsTrunkEditor($(e.currentTarget).attr('data-id'), true, users);
+		}));
+	};
+
+	// SMS TRUNK DELETE EVENT
+	const eventSMSTrunkDelete = () => {
+		$('.sms_trunk_delete').off('click');
+		$('.sms_trunk_delete').on('click', (async function (e) {
+			const button = $(e.currentTarget);
+			const sms_trunk_id = button.attr('data-id');
+			const sms_trunk_number = button.attr('data-number');
+			const confirmed = await confirmRingotelAction({
+				title: 'Delete number',
+				message: `Delete <b>${prettyNumber(sms_trunk_number)}</b> from ${escapeText(RINGOTEL_DISPLAY_NAME)}?<br>Its users can no longer send or receive SMS on it. The number stays on the provider account.`,
+				confirmLabel: 'Delete'
+			});
+			if (!confirmed) return;
+			button.attr('disabled', true);
+			$.ajax({
+				url: "/app/ringotel/service.php?method=delete_sms_trunk",
+				type: "post",
+				data: { orgid: $('#delete_organization').attr('data-account') || ORG_ID, id: sms_trunk_id },
+				success: function (response) {
+					checkErrors(response);
+					$('#sms_trunk_' + sms_trunk_id).slideUp(300, function () {
+						$(this).remove();
+						const left = $('#integration_service_container').children('.rt-sms-number').length;
+						$('#rt_sms_numbers_count').text(left);
+						!left && $('#integration_service_container').html(smsNumbersEmptyElement());
+					});
+					sms_trunk_number && USED_SMS_NUMBERS.delete(tenDigits(sms_trunk_number));
+				},
+				error: function () {
+					button.attr('disabled', false);
+				}
+			});
+		}));
+	};
+
+	const smsNumbersEmptyElement = () => `<div class="rt-sms-empty-list">No SMS numbers yet.${$('body').hasClass('ringotel-no-add') ? '' : ' Use <b>Add number</b> to give users a number.'}</div>`;
+
 	// Get Numbers Configuration
 	const getSMSTrunk = (parksUserExtensions) => {
-		// disable Button
 		$('#manageNumbersModal_button').attr('disabled', true);
-		// get smsTrunk
 		const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
 		$.ajax({
 			url: "/app/ringotel/service.php?method=get_sms_trunk",
 			type: "post",
-			cache: true,
 			data: { orgid },
 			success: function (response) {
 				checkErrors(response);
 				const { result } = JSON.parse(response.replaceAll("\\", ""));
-				// console.log('[getSMSTrunk --------> ', result);
-				if (result?.length > 0) {
-					// get List of Users to compare their id's
-					$('#integration_service').css('width', '100%');
-					result.map((item, k) => {
-						const elementSMSTrunk_ = elementSMSTrunk(item, parksUserExtensions);
-						if (k === 0) {
-							$('#integration_service_container').html(elementSMSTrunk_);
-						} else {
-							$('#integration_service_container').append(elementSMSTrunk_);
-						}
-					});
+				const trunks = Array.isArray(result) ? result : [];
+				$('#rt_sms_numbers_count').text(trunks.length);
+				$('#integration_service_container').html(trunks.length ? trunks.map((item) => elementSMSTrunk(item, parksUserExtensions)).join('') : smsNumbersEmptyElement());
 
-					// clear manage options accesible numbers
-					USED_SMS_NUMBERS = new Set(result.map(({ number }) => tenDigits(number)).filter(Boolean));
+				// numbers in use are not offered again
+				USED_SMS_NUMBERS = new Set(trunks.map(({ number }) => tenDigits(number)).filter(Boolean));
 
-					const regexp = /[\+*]/; // Parks param detect
-					const users = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
+				const regexp = /[\+*]/; // Parks param detect
+				const users = (parksUserExtensions || []).filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
 
-					// Reload Event Listeners
-					eventSMSTrunkDelete();
-					eventSMSTrunkUpdate(users);
-					eventSMSTrunkSave();
-					eventSMSTrunkClose();
-				};
-				setTimeout(() => {
-					$('#manageNumbersModal_button').attr('disabled', false);
-				}, 300);
+				eventSMSTrunkDelete();
+				eventSMSTrunkUpdate(users);
+				eventSMSTrunkSave();
+				eventSMSTrunkClose();
+				$('#manageNumbersModal_button').attr('disabled', false);
 			},
-			error: function (jqXHR, textStatus, errorThrown) {
-				// console.log(textStatus, errorThrown);
+			error: function () {
+				$('#manageNumbersModal_button').attr('disabled', false);
 			}
 		});
 	}
@@ -1352,7 +1215,7 @@
 			const service = button.attr('data-service');
 			const name = button.attr('data-name');
 			const confirmed = await confirmRingotelAction({
-				title: 'Disconnect ' + escapeText(name),
+				title: 'Disconnect ' + name,
 				message: `Disconnect <b>${escapeText(name)}</b> from ${escapeText(RINGOTEL_DISPLAY_NAME)}?<br>Users can no longer send or receive SMS through ${escapeText(name)} numbers.`,
 				confirmLabel: 'Disconnect'
 			});
@@ -1410,6 +1273,11 @@
 
 				eventIntegrationCreate();
 				eventDisableIntegrationFunc();
+				$('.rt-sms-webhook').off('click').on('click', function () {
+					const url = $(this).attr('data-webhook');
+					const done = () => { const b = $(this); b.html('<i class="fa fa-check" aria-hidden="true"></i> Copied'); setTimeout(() => b.html('<i class="fa fa-link" aria-hidden="true"></i> Webhook'), 2000); };
+					navigator.clipboard?.writeText(url).then(done, () => window.prompt('Inbound SMS webhook', url)) ?? window.prompt('Inbound SMS webhook', url);
+				});
 
 				if (connected.length) {
 					// Enable Button
@@ -1441,7 +1309,6 @@
 
 				setTimeout(() => {
 					$('#integration_service').slideDown(300);
-					$('#integration_service_container').slideDown(300);
 					$('#manageNumbersModal_button').attr('disabled', false);
 				}, 300);
 			},

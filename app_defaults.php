@@ -16,13 +16,13 @@
 	}
 
 //give the admin group the app: open it, see the extensions and the Ringotel column, edit contacts, send the welcome
-//email to a new extension and reset passwords. Adding, editing, deleting, activating and disabling Ringotel users stays superadmin only. A permission that already has a row
+//email to a new extension, reset passwords and choose the users of an existing SMS number. Adding, editing, deleting, activating and disabling Ringotel users stays superadmin only. A permission that already has a row
 //for the group (assigned or not) is left alone, so a change made in Group Manager is kept
 	if ($domains_processed == 1) {
 		$sql = "select group_uuid from v_groups where group_name = 'admin' and domain_uuid is null ";
 		$ringotel_admin_uuid = $database->select($sql, null, 'column');
 		if (!empty($ringotel_admin_uuid)) {
-			foreach (['ringotel', 'ringotel_extensions', 'extension_ringotel', 'ringotel_contacts', 'ringotel_extension_welcome', 'ringotel_extension_password'] as $ringotel_permission) {
+			foreach (['ringotel', 'ringotel_extensions', 'extension_ringotel', 'ringotel_contacts', 'ringotel_extension_welcome', 'ringotel_extension_password', 'ringotel_sms_number_users'] as $ringotel_permission) {
 				$sql = "select count(*) from v_group_permissions where group_uuid = :group_uuid and permission_name = :permission_name ";
 				$parameters = ['group_uuid' => $ringotel_admin_uuid, 'permission_name' => $ringotel_permission];
 				if ($database->select($sql, $parameters, 'column') == 0) {

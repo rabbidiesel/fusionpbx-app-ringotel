@@ -421,7 +421,7 @@
 	body.ringotel-no-add #create_parks_modal_button, body.ringotel-no-add #create_users_button,
 	body.ringotel-no-add .integration_create, body.ringotel-no-add #manage_numbers_activate_button, body.ringotel-no-add #manageNumbersModal_button { display: none !important; }
 	body.ringotel-no-edit [id^='editConnectModal_button_'], body.ringotel-no-edit .edit_user,
-	body.ringotel-no-edit #parks_update, body.ringotel-no-edit #parks_save, body.ringotel-no-edit .sms_trunk_save,
+	body.ringotel-no-edit #parks_update, body.ringotel-no-edit #parks_save, body.ringotel-no-sms-users .sms_trunk_save, body.ringotel-no-sms-users .sms_trunk_update,
 	body.ringotel-no-edit #packageid_switcher_container { display: none !important; }
 	body.ringotel-no-manage .reSyncAllNames, body.ringotel-no-manage .reSyncAllPassword, body.ringotel-no-manage .reSyncPassword,
 	body.ringotel-no-password .resetPassword, body.ringotel-no-manage .activateUser, body.ringotel-no-manage .deactivateUser { display: none !important; }
@@ -433,3 +433,43 @@
 	body.ringotel-no-organization #not_exist_organization_note { display: none !important; }
 	body.ringotel-no-connections #connection_module { display: none !important; }
 	body.ringotel-no-parks #parks_module { display: none !important; }
+
+/* SMS integration: providers bar and numbers list */
+	.rt-sms { background: #fff; border: 1px solid #e3e6ea; border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; }
+	.rt-sms-section-title { font-size: 13pt; font-weight: 600; color: #333; display: flex; align-items: center; gap: 8px; }
+	.rt-sms-count { display: inline-block; min-width: 22px; padding: 0 7px; border-radius: 11px; background: #eef1f4; color: #555; font-size: 9pt; font-weight: 600; text-align: center; line-height: 20px; }
+	.rt-sms-providers { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 4px; }
+	.rt-sms-provider-chip { display: flex; align-items: center; gap: 8px; border: 1px solid #e3e6ea; border-radius: 8px; padding: 6px 10px; background: #fafbfc; }
+	.rt-sms-provider-chip.connected { border-color: #b7e1c1; background: #f3fbf5; }
+	.rt-sms-provider-logo img { width: 22px; height: 22px; object-fit: contain; }
+	.rt-sms-provider-name { font-weight: 600; }
+	.rt-sms-status { font-size: 9pt; color: #888; }
+	.rt-sms-provider-chip.connected .rt-sms-status { color: #2e7d32; }
+	.rt-sms-provider-chip.connected .rt-sms-status:before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #43a047; margin-right: 4px; vertical-align: 1px; }
+	.rt-sms-provider-chip .btn-link { padding: 0 4px; font-size: 9pt; }
+	.rt-sms-provider-chip .integration_disconnect { color: #c62828; }
+	.rt-sms-provider-chip .btn-primary { padding: 1px 10px; font-size: 9pt; }
+	.rt-sms-muted { font-size: 9pt; color: #999; }
+	.rt-sms-numbers-head { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #eef0f2; margin-top: 14px; padding-top: 14px; }
+	.rt-sms-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; }
+	.rt-sms-number { background: #fff; border: 1px solid #e3e6ea; border-radius: 10px; padding: 14px 16px; min-width: 0; }
+	.rt-sms-number-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+	.rt-sms-number-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+	.rt-sms-number-digits { font-size: 15pt; font-weight: 700; color: #222; white-space: nowrap; }
+	.rt-sms-number-name { color: #555; font-size: 11pt; }
+	.rt-sms-name-input { width: 180px; display: inline-block; }
+	.rt-sms-provider { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1565c0; background: #e8f1fc; border-radius: 4px; padding: 1px 6px; }
+	.rt-sms-actions { display: flex; gap: 6px; flex-shrink: 0; }
+	.rt-sms-details { font-size: 9pt; color: #888; margin: 4px 0 10px; }
+	.rt-sms-users-label { font-size: 9pt; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+	.rt-sms-users { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow-y: auto; }
+	.rt-sms-user { background: #eef1f4; color: #333; border-radius: 12px; padding: 2px 10px; font-size: 10pt; white-space: nowrap; }
+	.rt-sms-user small { color: #888; margin-left: 2px; }
+	.rt-sms-user-unknown { color: #999; font-style: italic; }
+	.rt-sms-empty, .rt-sms-empty-list { color: #999; font-size: 10pt; }
+	.rt-sms-empty-list { padding: 12px 0 0; }
+	.rt-sms-editor-buttons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+	@media (max-width: 575px) {
+		.rt-sms-list { grid-template-columns: 1fr; }
+		.rt-sms-number-head { flex-direction: column; }
+	}
