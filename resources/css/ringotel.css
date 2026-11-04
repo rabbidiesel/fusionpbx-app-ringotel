@@ -473,3 +473,4 @@
 		.rt-sms-list { grid-template-columns: 1fr; }
 		.rt-sms-number-head { flex-direction: column; }
 	}
+	.rt-sms-numbers-head-only { border-top: 0; margin-top: 0; padding-top: 0; }

@@ -909,21 +909,19 @@
 				: (p.configured
 					? `<button class="btn btn-primary btn-sm integration_create" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}"><span class="integration_button_text">Connect</span><span class="integration_button_loading" style="display: none;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Connecting...</span></button>`
 					: '<span class="rt-sms-muted">Not set up</span>');
-			const webhook = connected && p.webhook
-				? `<button class="btn btn-link btn-sm rt-sms-webhook" data-webhook="${escapeText(p.webhook)}" title="Copy the inbound SMS webhook to set at ${escapeText(p.name)}"><i class="fa fa-link" aria-hidden="true"></i> Webhook</button>`
-				: '';
 			return `<div class="rt-sms-provider-chip ${connected ? 'connected' : ''}" data-service="${escapeText(p.id)}">
 						<span class="rt-sms-provider-logo">${logo}</span>
 						<span class="rt-sms-provider-name">${escapeText(p.name)}</span>
 						<span class="rt-sms-status">${connected ? 'Connected' : 'Not connected'}</span>
-						${webhook}${action}
+						${action}
 					</div>`;
 		}).join('');
 		const any_connected = providers.some((p) => p.state === 1);
+		const show_providers = !$('body').hasClass('ringotel-no-sms-providers');
 		return `<div id="integration_service" class="rt-sms" style="display:none;">
-					<div class="rt-sms-section-title">SMS providers</div>
-					<div class="rt-sms-providers">${chips}</div>
-					${any_connected ? `<div class="rt-sms-numbers-head">
+					${show_providers ? `<div class="rt-sms-section-title">SMS providers</div>
+					<div class="rt-sms-providers">${chips}</div>` : ''}
+					${any_connected ? `<div class="rt-sms-numbers-head${show_providers ? '' : ' rt-sms-numbers-head-only'}">
 						<div class="rt-sms-section-title">Numbers <span id="rt_sms_numbers_count" class="rt-sms-count">0</span></div>
 						<button id="manageNumbersModal_button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#manageNumbersModal"><i class="fa fa-plus" aria-hidden="true"></i> Add number</button>
 					</div>` : '<div class="rt-sms-empty-list">Connect a provider to add SMS numbers.</div>'}
@@ -1030,13 +1028,13 @@
 			`Inbound ${escapeText(data?.inboundFormat || '-')}`,
 			`Opt-out ${data?.optout?.autoreply && data?.optout?.keyword ? 'on' : 'off'}`
 		].join(' &middot; ');
-		return `<div id="sms_trunk_${data.id}" class="rt-sms-number" data-id="${data.id}" data-service="${escapeText(data?.service || 'Bandwidth')}" data-number="${escapeText(data?.number || '')}" data-name="${escapeText(data?.name || '')}">
+		return `<div id="sms_trunk_${data.id}" class="rt-sms-number" data-id="${data.id}" data-service="${escapeText(data?.service || '')}" data-number="${escapeText(data?.number || '')}" data-name="${escapeText(data?.name || '')}">
 					<div class="rt-sms-number-head">
 						<div class="rt-sms-number-title">
 							<span class="rt-sms-number-digits">${prettyNumber(data?.number)}</span>
 							<span id="table_sms_trunk_name_h5_${data.id}" class="rt-sms-number-name">${escapeText(data?.name || '')}</span>
 							<input id="table_sms_trunk_name_input_${data.id}" class="form-control form-control-sm rt-sms-name-input" style="display: none;" value="${escapeText(data?.name || '')}" placeholder="Name">
-							<span class="rt-sms-provider">${escapeText(data?.service || '-')}</span>
+							${data?.service ? `<span class="rt-sms-provider">${escapeText(data.service)}</span>` : ''}
 						</div>
 						<div class="rt-sms-actions">
 							<button id="sms_trunk_update_${data.id}" class="btn btn-sm btn-outline-primary sms_trunk_update" data-id="${data.id}"><i class="fa fa-users" aria-hidden="true"></i> Edit users</button>
@@ -1244,6 +1242,9 @@
 
 	// No provider set up in the default settings and none connected
 	const notExistIntegrationElement = () => {
+		if ($('body').hasClass('ringotel-no-sms-providers')) {
+			return `<div id="not_exist_integration" class="rt-sms"><div class="rt-sms-section-title">Numbers</div><div class="rt-sms-empty-list">SMS is not set up for this account yet.</div></div>`;
+		}
 		return `<div id="not_exist_integration" class="jumbotron" style="background-color: white; border: 0px solid #b5b5b5;padding: 2rem 2rem;">		  <hr>		  <p style="font-size: 14pt;">Allow sending and receiving SMS/MMS for users through Bandwidth, Telnyx or BulkVS.</p>		  <p>No SMS provider is set up yet. Fill in its credentials under Advanced &gt; Default Settings &gt; ringotel (or as a domain setting for this client).</p>	</div>`;
 	}
 
@@ -1273,11 +1274,6 @@
 
 				eventIntegrationCreate();
 				eventDisableIntegrationFunc();
-				$('.rt-sms-webhook').off('click').on('click', function () {
-					const url = $(this).attr('data-webhook');
-					const done = () => { const b = $(this); b.html('<i class="fa fa-check" aria-hidden="true"></i> Copied'); setTimeout(() => b.html('<i class="fa fa-link" aria-hidden="true"></i> Webhook'), 2000); };
-					navigator.clipboard?.writeText(url).then(done, () => window.prompt('Inbound SMS webhook', url)) ?? window.prompt('Inbound SMS webhook', url);
-				});
 
 				if (connected.length) {
 					// Enable Button

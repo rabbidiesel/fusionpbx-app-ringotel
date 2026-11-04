@@ -1086,8 +1086,12 @@ class ringotel {
 				'logo' => $service['logo'] ?? '',
 				'state' => $connected ? 1 : 0,
 				'configured' => $provider->is_configured(),
-				'webhook' => $connected ? ($service['webhook'] ?? '') : '',
 			);
+		}
+		//only a superadmin sees which carriers there are; others only learn whether SMS is connected
+		if (!if_group('superadmin')) {
+			$connected = count(array_filter($result, function ($row) { return $row['state'] == 1; }));
+			$result = $connected > 0 ? array(array('id' => '', 'name' => '', 'logo' => '', 'state' => 1, 'configured' => false)) : array();
 		}
 		return array("result" => $result);
 	}
@@ -1155,7 +1159,16 @@ class ringotel {
 			'orgid' => $queryParams['orgid']
 		);
 		//main
-		return $this->api->get_sms_trunk($param);
+		$server_output = $this->api->get_sms_trunk($param);
+		//only a superadmin sees the carrier of a number
+		if (!if_group('superadmin') && is_array($server_output['result'] ?? null)) {
+			foreach ($server_output['result'] as $key => $trunk) {
+				if (is_array($trunk)) {
+					unset($server_output['result'][$key]['service']);
+				}
+			}
+		}
+		return $server_output;
 	}
 
 	/**

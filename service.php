@@ -190,10 +190,10 @@ if (!empty($integration)) {
             }
         }
 
-        //users of an SMS number only: everything but the users is taken from the stored number configuration
-        if ($object_method == 'update_sms_trunk' && !permission_exists('ringotel_extension_edit')) {
+        //SMS number: the carrier is never sent to the page, so it (and without edit also the name and number) comes from the stored configuration
+        if ($object_method == 'update_sms_trunk') {
             $stored = null;
-            $trunks = $ringotel->get_sms_trunk(['orgid' => $queryParams['orgid'] ?? '']);
+            $trunks = $ringotel_api_functions->get_sms_trunk(['orgid' => $queryParams['orgid'] ?? '']);
             foreach ((is_array($trunks['result'] ?? null) ? $trunks['result'] : []) as $trunk) {
                 if ((string)($trunk['id'] ?? '') === (string)($queryParams['id'] ?? '')) {
                     $stored = $trunk;
@@ -203,9 +203,11 @@ if (!empty($integration)) {
                 echo json_encode(array('success' => false, 'data' => 'access denied: SMS number not found'));
                 exit;
             }
-            $queryParams['name'] = $stored['name'] ?? '';
-            $queryParams['number'] = (string)($stored['number'] ?? '');
             $queryParams['service'] = $stored['service'] ?? '';
+            if (!permission_exists('ringotel_extension_edit')) {
+                $queryParams['name'] = $stored['name'] ?? '';
+                $queryParams['number'] = (string)($stored['number'] ?? '');
+            }
         }
     }
     if (method_exists($ringotel, $object_method)) {
