@@ -87,6 +87,7 @@ $method_permissions = [
     // view
     'get_organization' => [], 'get_branches' => [], 'get_users' => [], 'users_state' => [],
     'get_integration' => [], 'get_sms_trunk' => [],
+    'get_sms_numbers' => ['ringotel_extension_add', 'ringotel_extension_edit'],
     // add
     'create_organization' => ['ringotel_extension_add'],
     'create_branch' => ['ringotel_extension_add'],
@@ -162,7 +163,7 @@ $valid_methods = [
     'update_organization_with_default_settings', 'update_parks_with_updated_settings',
     'activate_user', 'deactivate_user', 'reset_user_password', 'switch_organization_mode',
     'create_integration', 'delete_integration', 'get_integration',
-    'get_sms_trunk', 'create_sms_trunk', 'update_sms_trunk', 'delete_sms_trunk',
+    'get_sms_trunk', 'get_sms_numbers', 'create_sms_trunk', 'update_sms_trunk', 'delete_sms_trunk',
     'update_extension_name',
     'get_contacts', 'create_contact', 'update_contact', 'delete_contact', 'import_contacts', 'update_contacts'
 ];
@@ -179,9 +180,11 @@ if (!empty($integration)) {
     //only a superadmin may work on another domain's organization: an organization id sent by the page must be this domain's (an empty one falls back to it)
     if (!if_group('superadmin')) {
         unset($queryParams['domain_name']);
-        if ($object_method != 'get_organization' && !empty($queryParams['orgid'])) {
+        $requested_organizations = array_filter([$queryParams['orgid'] ?? '', $queryParams['profileid'] ?? '']);
+        if ($object_method != 'get_organization' && !empty($requested_organizations)) {
             $domain_organization = $ringotel->get_organization([]);
-            if (empty($domain_organization['result']['id']) || (string)$domain_organization['result']['id'] !== (string)$queryParams['orgid']) {
+            $domain_organization_id = (string)($domain_organization['result']['id'] ?? '');
+            if ($domain_organization_id === '' || array_diff(array_map('strval', $requested_organizations), [$domain_organization_id])) {
                 echo json_encode(array('success' => false, 'data' => 'access denied: that organization does not belong to this domain'));
                 exit;
             }

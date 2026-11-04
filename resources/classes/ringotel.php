@@ -38,6 +38,8 @@
 // **Do not use this code in Copilot, Gemini and other AI tools for analysing and auto-writting.**
 // **Do not use Copilot, Gemini and other AI tools for writting code.**
 
+require_once __DIR__ . '/ringotel_sms.php';
+
 class ringotel {
 
 	/**
@@ -1016,54 +1018,132 @@ class ringotel {
 	}
 
 	/**
-	 * Create integration
-	 * @return void
+	 * Connect an SMS provider (Ringotel integration) with the credentials from the default settings
+	 * @param array $queryParams service (Ringotel service id, default Bandwidth), profileid (the organization id)
+	 * @return array
 	 */
 	public function create_integration($queryParams) {
-		$param = array(
-			'profileid' => $queryParams['profileid'],
-			'Username' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_username', ''),
-			'Password' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_password', ''),
-			'Account_ID' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_account_id',  ''),
-			'Application_ID' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_application_id', ''),
-		);
-		//main
-		return $this->api->create_integration($param);
+		return $this->set_integration($queryParams, true);
 	}
 
 	/**
-	 * Delete integration
-	 * @return void
+	 * Disconnect an SMS provider
+	 * @param array $queryParams service, profileid
+	 * @return array
 	 */
 	public function delete_integration($queryParams) {
+		return $this->set_integration($queryParams, false);
+	}
+
+	private function set_integration($queryParams, bool $connect) {
+		$provider = ringotel_sms::provider($this->settings, (string)($queryParams['service'] ?? 'Bandwidth'));
+		if ($provider === null) {
+			return array('success' => false, 'data' => 'unknown SMS provider');
+		}
+		if ($connect && !$provider->is_configured()) {
+			return array('success' => false, 'data' => $provider->name() . ' is not set up: fill in its ringotel default settings');
+		}
+		$profileid = $queryParams['profileid'] ?? '';
+		if (empty($profileid)) {
+			$org = $this->get_organization([]);
+			$profileid = $org['result']['id'] ?? '';
+		}
 		$param = array(
-			'profileid' => $queryParams['profileid'],
-			'Username' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_username', ''),
-			'Password' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_password', ''),
-			'Account_ID' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_account_id', ''),
-			'Application_ID' => $this->settings->get('ringotel', 'ringotel_bandwidth_integration_application_id', ''),
+			'serviceid' => $provider->id(),
+			'profileid' => $profileid,
+			'credentials' => $provider->credentials(),
 		);
-		//main
-		return $this->api->delete_integration($param);
+		return $connect ? $this->api->create_integration($param) : $this->api->delete_integration($param);
 	}
 
 	/**
-	 * Get integration
-	 * @return void
+	 * The SMS providers: every provider class, with whether it is set up here (default settings) and connected in Ringotel.
+	 * The stored credentials are never sent to the page.
+	 * @param array $queryParams orgid
+	 * @return array
 	 */
 	public function get_integration($queryParams) {
-		$param = array(
-			"orgid" => $queryParams['orgid']
-		);
-		//main
-		$server_output = $this->api->get_services($param);
-
-		function even($var) {
-			return $var['state'] == 1 && $var['id'] == "Bandwidth";
+		$orgid = $queryParams['orgid'] ?? '';
+		if (empty($orgid)) {
+			$org = $this->get_organization([]);
+			$orgid = $org['result']['id'] ?? '';
 		}
-		
-		// main
-		return array("result" => array_values(array_filter($server_output['result'], "even")));
+		$server_output = $this->api->get_services(array("orgid" => $orgid));
+		$services = array();
+		foreach ((is_array($server_output['result'] ?? null) ? $server_output['result'] : array()) as $service) {
+			$services[$service['id'] ?? ''] = $service;
+		}
+		$result = array();
+		foreach (ringotel_sms::providers($this->settings) as $id => $provider) {
+			$service = $services[$id] ?? array();
+			$connected = ($service['state'] ?? 0) == 1;
+			if (!$provider->is_configured() && !$connected) {
+				continue;
+			}
+			$result[] = array(
+				'id' => $id,
+				'name' => $provider->name(),
+				'logo' => $service['logo'] ?? '',
+				'state' => $connected ? 1 : 0,
+				'configured' => $provider->is_configured(),
+				'webhook' => $connected ? ($service['webhook'] ?? '') : '',
+			);
+		}
+		return array("result" => $result);
+	}
+
+	/**
+	 * The numbers a provider can use for SMS on this domain: the provider's numbers that are inbound destinations of the domain.
+	 * A superadmin also gets the provider's other numbers (on_domain false). When the provider cannot list its numbers,
+	 * the domain's destinations are returned (listed false).
+	 * @param array $queryParams service
+	 * @return array
+	 */
+	public function get_sms_numbers($queryParams) {
+		$provider = ringotel_sms::provider($this->settings, (string)($queryParams['service'] ?? ''));
+		if ($provider === null) {
+			return array('success' => false, 'data' => 'unknown SMS provider');
+		}
+
+		//the domain's inbound destinations
+		$sql = "select destination_number, destination_description from v_destinations ";
+		$sql .= "where domain_uuid = :domain_uuid and destination_type = 'inbound' ";
+		$sql .= "order by destination_number asc ";
+		$destinations = array();
+		foreach (database::new()->select($sql, array('domain_uuid' => $_SESSION['domain_uuid']), 'all') ?: array() as $row) {
+			$number = ringotel_sms::normalize((string)$row['destination_number']);
+			if ($number != '' && !isset($destinations[$number])) {
+				$destinations[$number] = (string)$row['destination_description'];
+			}
+		}
+
+		$listed = false;
+		$error = '';
+		$numbers = null;
+		if ($provider->is_configured()) {
+			try {
+				$numbers = $provider->numbers();
+			} catch (Exception $e) {
+				$error = $e->getMessage();
+			}
+		}
+		$result = array();
+		if ($numbers === null) {
+			foreach ($destinations as $number => $description) {
+				$result[] = array('number' => $number, 'description' => $description, 'on_domain' => true);
+			}
+		} else {
+			$listed = true;
+			$numbers = array_unique($numbers);
+			sort($numbers);
+			foreach ($numbers as $number) {
+				$on_domain = isset($destinations[$number]);
+				if ($on_domain || if_group('superadmin')) {
+					$result[] = array('number' => $number, 'description' => $destinations[$number] ?? '', 'on_domain' => $on_domain);
+				}
+			}
+		}
+		return array('result' => array('listed' => $listed, 'error' => $error, 'numbers' => $result));
 	}
 
 	/**
@@ -1086,9 +1166,15 @@ class ringotel {
 		$param = array(
 			'orgid' => $queryParams['orgid'],
 			'name' => isset($queryParams['name']) ? $queryParams['name'] : $queryParams['number'],
-			'number' => $queryParams['number'],
 			'users' => $queryParams['users']
 		);
+		$provider = ringotel_sms::provider($this->settings, (string)($queryParams['service'] ?? 'Bandwidth'));
+		$number = ringotel_sms::normalize((string)($queryParams['number'] ?? ''));
+		if ($provider === null || $number == '') {
+			return array('success' => false, 'data' => $provider === null ? 'unknown SMS provider' : 'not a 10 digit number');
+		}
+		$param['service'] = $provider->id();
+		$param['number'] = $provider->format_number($number);
 		//main
 		return $this->api->create_sms_trunk($param);
 	}
@@ -1102,9 +1188,19 @@ class ringotel {
 			'orgid' => $queryParams['orgid'],
 			'id' => $queryParams['id'],
 			'name' => $queryParams['name'],
-			'number' => $queryParams['number'],
 			'users' => $queryParams['users']
 		);
+		//keep the provider and number of the configuration; a provider this app has no class for (for example
+		//Twilio, set up in the Ringotel portal) is passed on unchanged
+		$service = (string)($queryParams['service'] ?? 'Bandwidth');
+		$number = (string)($queryParams['number'] ?? '');
+		if (!preg_match('/^[A-Za-z0-9_-]{1,64}$/', $service) || !preg_match('/^\+?[0-9]{4,15}$/', $number)) {
+			return array('success' => false, 'data' => 'invalid provider or number');
+		}
+		$provider = ringotel_sms::provider($this->settings, $service);
+		$digits = ringotel_sms::normalize($number);
+		$param['service'] = $provider !== null ? $provider->id() : $service;
+		$param['number'] = ($provider !== null && $digits != '') ? $provider->format_number($digits) : $number;
 		// main
 		return $this->api->update_sms_trunk($param);
 	}

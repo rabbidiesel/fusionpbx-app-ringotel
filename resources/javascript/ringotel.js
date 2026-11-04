@@ -754,8 +754,58 @@
 		}
 	};
 
+	// numbers already used by a number configuration (not offered again)
+	let USED_SMS_NUMBERS = new Set();
+	// +12125551234, 12125551234 or 2125551234 -> 2125551234
+	const tenDigits = (number) => {
+		const digits = String(number || '').replace(/\D/g, '');
+		return digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits;
+	};
+
+	// Fill the phone number list for a provider: its numbers on this domain, or the domain's destinations when it can't list them
+	const loadSmsNumbers = (service) => {
+		const select = $('#manage_numbers_phone_number');
+		select.html('<option value="">Loading...</option>').attr('disabled', true);
+		$('#manage_numbers_numbers_note').text('');
+		if (!service) {
+			select.html('<option value=""></option>');
+			return;
+		}
+		$.ajax({
+			url: "/app/ringotel/service.php?method=get_sms_numbers",
+			type: "get",
+			data: { service },
+			success: function (response) {
+				checkErrors(response);
+				const { result } = JSON.parse(response.replaceAll("\\", ""));
+				const numbers = (result?.numbers || []).map((item) => ({ ...item, number: String(item.number) })).filter((item) => !USED_SMS_NUMBERS.has(item.number));
+				const option = (item) => `<option value="${escapeText(item.number)}">${escapeText(item.number)}${item.description ? ' - ' + escapeText(item.description) : ''}</option>`;
+				const on_domain = numbers.filter((item) => item.on_domain).map(option).join('');
+				const other = numbers.filter((item) => !item.on_domain).map(option).join('');
+				select.html('<option value=""></option>' + on_domain + (other ? `<optgroup label="Other numbers on the account">${other}</optgroup>` : '')).attr('disabled', false);
+				let note = '';
+				if (result?.error) {
+					note = `Could not read the numbers from the provider (${result.error}), showing this domain's destinations.`;
+				} else if (result?.listed) {
+					note = numbers.length ? 'Numbers on the provider account that are destinations of this domain.' : 'None of the numbers on the provider account is a free destination of this domain.';
+				} else {
+					note = "This provider can't list its numbers, showing this domain's destinations.";
+				}
+				$('#manage_numbers_numbers_note').text(note);
+			},
+			error: function () {
+				select.html('<option value=""></option>').attr('disabled', false);
+			}
+		});
+	};
+
 	// Create Numbers Configuration
 	const eventSaveIntegratedUsers = () => {
+		// Provider: load its numbers
+		$('#manage_numbers_service').off('change').on('change', (function () {
+			loadSmsNumbers($(this).val());
+		}));
+
 		// Phone Number Required Field
 		$('#manage_numbers_phone_number').on('change', (function (el) {
 			if (el.target?.value?.trim()) {
@@ -771,9 +821,10 @@
 		// Save Button
 		$('#manage_numbers_activate_button').on('click', (function () {
 			const name = $('#manage_numbers_friendly_name').val().trim();
-			const number = $('#manage_numbers_phone_number').val().trim();
+			const number = ($('#manage_numbers_phone_number').val() || '').trim();
 			const users = $('#manage_numbers_users').val();
-			if (users?.length === 0 || !number) {
+			const service = $('#manage_numbers_service').val();
+			if (users?.length === 0 || !number || !service) {
 				!number && $('#manage_numbers_phone_number').addClass('alert-danger');
 				if (users?.length === 0) {
 					$('#multiselect_dropdown').addClass('alert-danger');
@@ -785,8 +836,7 @@
 				$('#manage_numbers_activate_text').slideUp(300);
 				$('#manage_numbers_activate_loading').slideDown(300);
 				const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
-				const data = { orgid, name, number, users };
-				// console.log('[manage_numbers_activate_button] data', data);
+				const data = { orgid, name, number, users, service };
 
 				// Create Ajax Funciton
 				$.ajax({
@@ -796,8 +846,6 @@
 					data,
 					success: async function (response) {
 						checkErrors(response);
-						const { result } = JSON.parse(response.replaceAll("\\", ""));
-						// console.log('[create_sms_trunk --------> ', result);
 
 						// re-Update Trunk
 						const parksUserExtensions = await getUsersWithUpdateElements(); // Get Users Again For Updating DOM and For SMS Trunk
@@ -816,54 +864,69 @@
 		}));
 	}
 
+	// Connect a provider (Ringotel integration) with the credentials from the default settings
 	const eventIntegrationCreate = () => {
-		$('#integration_create').off('click');
-		// Create Integration Functional
-		$('#integration_create').on('click', () => {
-			$('#integration_create').attr('disabled', true);
-			$('#create_inter_text').fadeOut(300);
-			const profileid = $('#delete_organization').attr('data-account');
-			setTimeout(() => {
-				$('#create_inter_loading').fadeIn();
-				$.ajax({
-					url: "/app/ringotel/service.php?method=create_integration",
-					type: "get",
-					cache: true,
-					data: { profileid },
-					success: function (response) {
-						checkErrors(response);
-						const { result } = JSON.parse(response.replaceAll("\\", ""));
-						// console.log(' ------------ [createIntegration]', result);
-						if (result?.status === 200 && result?.state === 1) {
-							getIntegration();
-						} else {
-							const not_exist_integration_note = notExistIntegrationNoteElement("Integration is available in PRO version.");
-							$('#nav-integration').prepend(not_exist_integration_note);
-							$('#create_inter_loading').fadeOut(300);
-							setTimeout(() => {
-								$('#create_inter_text').fadeIn(300);
-								$('#integration_create').attr('disabled', false);
-							}, 300);
-						}
-					},
-					error: function (jqXHR, textStatus, errorThrown) {
-						// console.log(textStatus, errorThrown);
+		$('.integration_create').off('click');
+		$('.integration_create').on('click', (e) => {
+			const button = $(e.currentTarget);
+			const service = button.attr('data-service');
+			const profileid = $('#delete_organization').attr('data-account') || ORG_ID;
+			button.attr('disabled', true);
+			button.children('.integration_button_text').hide();
+			button.children('.integration_button_loading').show();
+			$.ajax({
+				url: "/app/ringotel/service.php?method=create_integration",
+				type: "get",
+				data: { profileid, service },
+				success: function (response) {
+					checkErrors(response);
+					const { result } = JSON.parse(response.replaceAll("\\", ""));
+					if (result?.status === 200 && result?.state === 1) {
+						getIntegration();
+					} else {
+						$('#nav-integration').prepend(notExistIntegrationNoteElement(`${escapeText(button.attr('data-name'))} could not be connected. SMS integrations are available in the PRO version.`));
+						button.children('.integration_button_loading').hide();
+						button.children('.integration_button_text').show();
+						button.attr('disabled', false);
 					}
-				});
-			}, 300);
+				},
+				error: function () {
+					button.children('.integration_button_loading').hide();
+					button.children('.integration_button_text').show();
+					button.attr('disabled', false);
+				}
+			});
 		});
 	}
 
-	const IntegrationElement = (data) => {
-		return `<div class="card" id="integration_service" style="width: 25rem; display:none;transition: all 1s;-moz-transition: all 1s;-webkit-transition: all 1s;">
-				  <img src="${data.logo}" class="card-img-top" alt="${data.id}" style="width: 2rem;left: 0;margin: 0.8rem 1.2rem 1rem;">
-				  <div class="card-body card-body-p" style="padding: 0 1.25rem 1.25rem 1.25rem;">
-					<h5 class="card-title" style="font-size: 17pt;font-weight: 700;display: flex;align-items: center;">
-						${data.name}
-						<button id="manageNumbersModalDisable" class="btn btn-outline-danger" style="font-size: 9pt;padding: 0px 10px;margin: 0px 10px;height: 20px;align-items: center;display: flex;">Disable</button>
-					</h5>
-					<p class="card-text" style="font-size: 11pt;">Add numbers configured on Bandwidth and allocate users who will be able to send/recieve SMS.</p>
-					<button id="manageNumbersModal_button" class="btn btn-primary" data-toggle="modal" data-target="#manageNumbersModal">Manage numbers</button>
+	// The SMS providers card: one row per provider that is set up in the default settings or connected in Ringotel
+	const IntegrationElement = (providers) => {
+		const rows = providers.map((p) => {
+			const connected = p.state === 1;
+			const logo = p.logo ? `<img src="${escapeText(p.logo)}" alt="" style="width: 1.6rem;margin-right: 0.6rem;">` : '';
+			const status = connected
+				? '<span style="color: #4caf50;font-size: 10pt;margin-left: 10px;"><i class="fa fa-circle" aria-hidden="true"></i> Connected</span>'
+				: '<span style="color: #9e9e9e;font-size: 10pt;margin-left: 10px;"><i class="fa fa-circle" aria-hidden="true"></i> Not connected</span>';
+			const button = connected
+				? `<button class="btn btn-outline-danger integration_disconnect" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}" style="font-size: 9pt;padding: 0px 10px;margin-left: auto;height: 22px;">Disconnect</button>`
+				: (p.configured
+					? `<button class="btn btn-primary integration_create" data-service="${escapeText(p.id)}" data-name="${escapeText(p.name)}" style="font-size: 9pt;padding: 0px 10px;margin-left: auto;height: 22px;"><span class="integration_button_text">Connect</span><span class="integration_button_loading" style="display: none;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Connecting...</span></button>`
+					: '<span style="margin-left: auto;font-size: 9pt;color: #9e9e9e;">Not set up in Default Settings</span>');
+			const webhook = connected && p.webhook
+				? `<div style="font-size: 9pt;color: #666;margin: 4px 0 0 2.2rem;word-break: break-all;">Inbound SMS webhook to set at ${escapeText(p.name)}: <code>${escapeText(p.webhook)}</code></div>`
+				: '';
+			return `<div class="integration_provider" data-service="${escapeText(p.id)}" style="padding: 8px 0;border-bottom: 1px solid #eee;">
+						<div style="display: flex;align-items: center;">${logo}<b style="font-size: 12pt;">${escapeText(p.name)}</b>${status}${button}</div>
+						${webhook}
+					</div>`;
+		}).join('');
+		const any_connected = providers.some((p) => p.state === 1);
+		return `<div class="card" id="integration_service" style="width: 32rem;max-width: 100%;display:none;">
+				  <div class="card-body card-body-p">
+					<h5 class="card-title" style="font-size: 17pt;font-weight: 700;">SMS providers</h5>
+					${rows}
+					<p class="card-text" style="font-size: 11pt;margin-top: 12px;">${any_connected ? 'Add numbers from a connected provider and allocate users who will be able to send/receive SMS.' : 'Connect a provider to add numbers.'}</p>
+					${any_connected ? '<button id="manageNumbersModal_button" class="btn btn-primary" data-toggle="modal" data-target="#manageNumbersModal">Manage numbers</button>' : ''}
 				  </div>
 				</div>
 				`;
@@ -873,7 +936,7 @@
 		return `<div id="integration_service_container" style="display:none;"><div>`
 	}
 
-	const MembersIntegrationModalelement = () => {
+	const MembersIntegrationModalelement = (providers) => {
 		return `<div class="modal hide fade" id="manageNumbersModal" tabindex="-1" role="dialog" aria-labelledby="manageNumbersModalLabel" aria-hidden="true" style="display: none;">
 					  <div class="modal-dialog modal-dialog-centered" role="document" id="manageNumbersModal_modal_body">
 							<div class="modal-content">
@@ -896,16 +959,27 @@
 
 									<div class="input-group mb-3">
 											  <div class="input-group-prepend">
+													<div class="input-group-text" style="width: 150px;justify-content: end;">
+													Provider
+												</div>
+											  </div>
+											<select class="form-control" name="manage_numbers_service" id="manage_numbers_service">
+												${providers.map((p) => `<option value="${escapeText(p.id)}">${escapeText(p.name)}</option>`).join('')}
+											</select>
+									</div>
+
+									<div class="input-group mb-1">
+											  <div class="input-group-prepend">
 													<div class="input-group-text" id="basic-addon1" style="width: 150px;justify-content: end;">
 													Phone number
 												</div>
 											  </div>
 
-											<select class="form-control" name="manage_numbers_phone_number" id="manage_numbers_phone_number" placeholder="a Bandwidth phone number">
+											<select class="form-control" name="manage_numbers_phone_number" id="manage_numbers_phone_number" placeholder="a phone number on the provider">
 												<option value=""></option>
-												${RINGOTEL_DESTINATION_OPTIONS}
 											</select>
 									</div>
+									<div id="manage_numbers_numbers_note" style="font-size: 9pt;color: #666;margin: 0 0 1rem 150px;"></div>
 
 									<div class="input-group mb-3" style="-ms-flex-wrap:nowrap;flex-wrap:nowrap;">
 											<div class="input-group-prepend">
@@ -949,7 +1023,7 @@
 			);
 		}).join('');
 
-		return `<div id="sms_trunk_${data.id}" class="card mb-3" style="height: 232px;max-width: 100%;margin: 10px 0px;box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.06) 0px 2px 4px -1px;">
+		return `<div id="sms_trunk_${data.id}" data-service="${escapeText(data?.service || 'Bandwidth')}" data-number="${escapeText(data?.number || '')}" class="card mb-3" style="height: 232px;max-width: 100%;margin: 10px 0px;box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.06) 0px 2px 4px -1px;">
 					  <div class="row no-gutters">
 						<div class="col-md-5">
 							<div class="card-body card-body-p">
@@ -965,6 +1039,10 @@
 										<td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;display:none;">
 											<input type="number" id="table_sms_trunk_number_input_${data.id}" name="table_sms_trunk_number_input" class="table_sms_trunk_number_input" style="padding: 0;margin: 0;width: inherit;border: 1px solid #837e7e52;padding: 0px 4px;border-radius: 20px;" value="${data?.number?.replace('+1', '') || ''}"/>
 										</td>
+									</tr>
+									<tr>
+										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Provider:</td>
+										  <td style="font-size: 12pt;width: 120px;padding: 0.25rem 0.75rem;">${escapeText(data?.service || '-')}</td>
 									</tr>
 									<tr>
 										  <td style="font-size: 12pt;padding: 0.25rem 0.75rem;">Country:</td>
@@ -1042,17 +1120,19 @@
 
 			// Get params for updating
 			const name = $('#table_sms_trunk_name_input_' + id).val();
-			const number = $('#table_sms_trunk_number_input_' + id).val();
+			const number = $('#sms_trunk_' + id).attr('data-number');
 			const users = $('#table_sms_trunk_manage_users_' + id).val();
 
 			// console.log('----> update sms trunk @name, @number, @users ', name, number, users);
 
+			const service = $('#sms_trunk_' + id).attr('data-service');
 			const data = {
 				orgid,
 				id,
 				name,
 				number,
-				users
+				users,
+				service
 			};
 			// console.log('[--------------eventSMSTrunkSave-------------] data', data);
 
@@ -1201,7 +1281,7 @@
 
 					// console.log('[eventSMSTrunkDelete ---------> sms_trunk_number', sms_trunk_number);
 					// show number in options if we are managing numbers
-					sms_trunk_number && $('#manage_numbers_phone_number').children(`option[value=${sms_trunk_number.replace('+1', '')}]`)?.slideDown();
+					sms_trunk_number && USED_SMS_NUMBERS.delete(tenDigits(sms_trunk_number));
 
 					setTimeout(() => {
 						// disable Button
@@ -1243,9 +1323,7 @@
 					});
 
 					// clear manage options accesible numbers
-					const exist_number = result.map(({ number }) => {
-						number && $('#manage_numbers_phone_number').children(`option[value=${number?.replace('+1', '')}]`)?.slideUp();
-					});
+					USED_SMS_NUMBERS = new Set(result.map(({ number }) => tenDigits(number)).filter(Boolean));
 
 					const regexp = /[\+*]/; // Parks param detect
 					const users = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
@@ -1266,26 +1344,31 @@
 		});
 	}
 
+	// Disconnect a provider
 	const eventDisableIntegrationFunc = () => {
-		$('#manageNumbersModalDisable').off('click');
-		// Disable Integration functionality
-		$('#manageNumbersModalDisable').on('click', (function () {
-			$('#manageNumbersModalDisable').attr('disabled', true);
-			$('#manageNumbersModal_button').attr('disabled', true);
-			$('#integration_service_container').slideUp();
-			const profileid = $('#delete_organization').attr('data-account');
+		$('.integration_disconnect').off('click');
+		$('.integration_disconnect').on('click', (async function (e) {
+			const button = $(e.currentTarget);
+			const service = button.attr('data-service');
+			const name = button.attr('data-name');
+			const confirmed = await confirmRingotelAction({
+				title: 'Disconnect ' + escapeText(name),
+				message: `Disconnect <b>${escapeText(name)}</b> from ${escapeText(RINGOTEL_DISPLAY_NAME)}?<br>Users can no longer send or receive SMS through ${escapeText(name)} numbers.`,
+				confirmLabel: 'Disconnect'
+			});
+			if (!confirmed) return;
+			button.attr('disabled', true);
+			const profileid = $('#delete_organization').attr('data-account') || ORG_ID;
 			$.ajax({
 				url: "/app/ringotel/service.php?method=delete_integration",
 				type: "get",
-				cache: true,
-				data: { profileid },
+				data: { profileid, service },
 				success: function (response) {
 					checkErrors(response);
-					// console.log('--------------> [deleteIntegration]', response);
 					getIntegration();
 				},
-				error: function (jqXHR, textStatus, errorThrown) {
-					// console.log(textStatus, errorThrown);
+				error: function () {
+					button.attr('disabled', false);
 				}
 			});
 		}));
@@ -1296,15 +1379,14 @@
 		return `<div id="not_exist_integration_note" class="alert alert-warning alert-dismissible fade show" style="" role="alert">		  <strong>${message || 'You don\'t have activated users.'}</strong>	  <button type="button" class="close" data-dismiss="alert" aria-label="Close"> 	    <span aria-hidden="true">×</span> 	  </button> 	</div>`;
 	}
 
-	// Template for not exist integration note
+	// No provider set up in the default settings and none connected
 	const notExistIntegrationElement = () => {
-		return `<div id="not_exist_integration" class="jumbotron" style="background-color: white; border: 0px solid #b5b5b5;padding: 2rem 2rem;">		  <hr>		  <p style="font-size: 14pt;">Allow sending and receiving SMS/MMS via Bandwidth for users.</p>		  <p class="lead">			<button type="button" class="btn btn-primary btn-lg" id="integration_create" style="padding: 0.15rem 1rem;">			<span id="create_inter_text">Create</span>			<span id="create_inter_loading" style="display: none;"> 				<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>	 				Loading...				</span>		</button>	  </p>		</div>`;
+		return `<div id="not_exist_integration" class="jumbotron" style="background-color: white; border: 0px solid #b5b5b5;padding: 2rem 2rem;">		  <hr>		  <p style="font-size: 14pt;">Allow sending and receiving SMS/MMS for users through Bandwidth, Telnyx or BulkVS.</p>		  <p>No SMS provider is set up yet. Fill in its credentials under Advanced &gt; Default Settings &gt; ringotel (or as a domain setting for this client).</p>	</div>`;
 	}
 
 	// get Integrations uses from getOrganization function
 	const getIntegration = (parameters) => {
 		const orgid = $('#delete_organization').attr('data-account') || ORG_ID;
-		// console.log('[getIntegration] ------------> orgid', orgid);
 		$.ajax({
 			url: "/app/ringotel/service.php?method=get_integration",
 			type: "get",
@@ -1312,33 +1394,31 @@
 			data: { orgid },
 			success: async function (response) {
 				checkErrors(response);
-				const { result, error } = JSON.parse(response.replaceAll("\\", ""));
-				if (Array.isArray(result) && result[0]?.id === "Bandwidth" && result[0]?.state === 1) {
-					// Button Form Create Actions
-					$('#create_inter_loading').fadeOut(300);
+				const { result } = JSON.parse(response.replaceAll("\\", ""));
+				const providers = Array.isArray(result) ? result : [];
+				const connected = providers.filter((p) => p.state === 1);
 
-					// Show Integrations Form
-					$('#not_exist_integration').slideUp(300);
+				if (providers.length === 0) {
+					$('#nav-integration').html(notExistIntegrationElement());
+					setTimeout(() => $('#not_exist_integration').slideDown(300), 300);
+					return;
+				}
 
-					// Exist Elemets
-					// const not_exist_integration_note = notExistIntegrationNoteElement();
-					const modal_member_numbers = MembersIntegrationModalelement();
-					const service_form = IntegrationElement(result[0]);
-					const integration_service_container = integrationServiceContainerElement();
+				$('#nav-integration').html(connected.length ? MembersIntegrationModalelement(connected) : '');
+				$('#nav-integration').append(IntegrationElement(providers));
+				$('#nav-integration').append(integrationServiceContainerElement());
 
-					// Replace All Elements
-					// $('#nav-integration').html(not_exist_integration_note);
-					$('#nav-integration').html(modal_member_numbers);
-					$('#nav-integration').append(service_form);
-					$('#nav-integration').append(integration_service_container);
+				eventIntegrationCreate();
+				eventDisableIntegrationFunc();
 
-					// Event "Integration Create"
-					eventIntegrationCreate();
-
+				if (connected.length) {
 					// Enable Button
 					$('#manage_numbers_activate_button').attr('disabled', false);
 
-					// Handle Hide Event For Modal
+					// Fill the numbers when the modal opens, clean it when it closes
+					$('#manageNumbersModal').on("show.bs.modal", function (e) {
+						if (e.target.id === 'manageNumbersModal') loadSmsNumbers($('#manage_numbers_service').val());
+					});
 					$('#manageNumbersModal').on("hidden.bs.modal", function () {
 						$('#manage_numbers_friendly_name').val('');
 						$('#manage_numbers_phone_number').val('');
@@ -1352,48 +1432,21 @@
 
 					// Add Event-Listener
 					eventSaveIntegratedUsers();
-					eventDisableIntegrationFunc(); // Disable Integration functionality
 
 					// Get Users Again For Updating DOM and For SMS Trunk
 					const parksUserExtensions = await getUsersWithUpdateElements();
 					// Get Numbers Configuration
 					getSMSTrunk(parksUserExtensions);
-
-					// Button Form Create Actions and show the Service Form 
-					setTimeout(() => {
-						$('#create_inter_text').fadeIn(300);
-						$('#integration_service').slideDown(300);
-						$('#integration_service_container').slideDown(300);
-
-						// Enable Button
-						$('#manageNumbersModalDisable').attr('disabled', false);
-						$('#manageNumbersModal_button').attr('disabled', false);
-					}, 300);
-
-				} else {
-					$('#integration_service').slideUp(300);
-					// Show Not Exists
-					// const not_exist_integration_note = notExistIntegrationNoteElement(error?.message);
-					const not_exist_integration = notExistIntegrationElement();
-					// $('#nav-integration').html(not_exist_integration_note);
-					$('#nav-integration').html(not_exist_integration);
-					setTimeout(() => {
-						$('#not_exist_integration').slideDown(300);
-						// $('#not_exist_integration_note').slideDown(300);
-						// Event "Integration Create"
-						eventIntegrationCreate();
-					}, 300);
 				}
 
-				$('#integration_create').attr('disabled', false);
+				setTimeout(() => {
+					$('#integration_service').slideDown(300);
+					$('#integration_service_container').slideDown(300);
+					$('#manageNumbersModal_button').attr('disabled', false);
+				}, 300);
 			},
 			error: function (jqXHR, textStatus, errorThrown) {
-				// console.log(textStatus, errorThrown);
-				const not_exist_integration = notExistIntegrationElement();
-				const not_exist_integration_note = notExistIntegrationNoteElement();
-				$('#nav-integration').html(not_exist_integration_note);
-				$('#nav-integration').append(not_exist_integration);
-
+				$('#nav-integration').html(notExistIntegrationNoteElement('Could not load the SMS providers.'));
 			}
 		});
 	}
@@ -2139,7 +2192,7 @@
 
 	// [Init] Check Organization
 	const getOrganization = () => {
-		$('#integration_create').attr('disabled', true);
+		$('.integration_create').attr('disabled', true);
 		// Set init Values
 		$('#domain_unique_name').val(RINGOTEL_DEFAULT_DOMAIN_UNIQUE_NAME);
 		$('#connection_domain').val(RINGOTEL_CONNECTION_DOMAIN);

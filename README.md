@@ -50,7 +50,7 @@ The Ringotel Feature Side App integrates with FusionPBX to help administrators:
     
 *   **Monitor Ringotel Status**: View Ringotel status for extensions within FusionPBX.
 
-*   **Bandwidth Integration**: Integrate with Bandwidth with exist ringotel users.
+*   **SMS Integrations**: Connect Bandwidth, Telnyx or BulkVS to the Ringotel organization and give users SMS/MMS on the provider's numbers.
     
 *   **Call Parks**: Enable and manage call parking functionality directly within the Ringotel environmen.
 
@@ -64,7 +64,17 @@ The Ringotel Feature Side App integrates with FusionPBX to help administrators:
 
 This streamlines user management for those using both FusionPBX and Ringotel.
 
-**In Integration tab, we currently have the Bandwidth integration feature. We may add more options later, or you can add new ones yourself.**
+**SMS integrations (Integration tab)**: Bandwidth, Telnyx and BulkVS. Each provider is its own class, `resources/classes/ringotel_sms_<name>.php` (see `resources/interfaces/ringotel_sms_interface.php`), with its credentials in Default Settings > ringotel (a domain setting gives a client its own account):
+
+| Provider | Default settings |
+|---|---|
+| Bandwidth | `ringotel_bandwidth_integration_username`, `_password`, `_account_id`, `_application_id` |
+| Telnyx | `ringotel_telnyx_api_key` |
+| BulkVS | `ringotel_bulkvs_username`, `ringotel_bulkvs_password` (the BulkVS API credentials) |
+
+The tab lists every provider that is set up or already connected in the Ringotel portal. **Connect** (needs `ringotel_extension_add`) turns the Ringotel integration on with those credentials; once connected the tab shows the inbound SMS webhook to set at the provider. **Disconnect** needs `ringotel_extension_delete` and asks for confirmation. **Manage numbers** picks a connected provider, lists the numbers on the provider account that are inbound destinations of the domain (a superadmin also sees the account's other numbers; Bandwidth, which has no number listing here, offers the domain's destinations) and assigns users to the number. Stored credentials are never sent to the page. A number configured in the portal with a provider this app has no class for (for example Twilio) is shown and can be edited without changing its provider.
+
+To add a provider, copy `ringotel_sms_telnyx.php`, set the Ringotel service id and its Ringotel credential field names (from the provider's page in the Ringotel portal), optionally list its numbers, and add its default settings to `app_config.php`.
 
 #### **Before accessing the Ringotel application page**, **update permissions and default settings** in FusionPBX. This ensures proper user access and module functionality.
 

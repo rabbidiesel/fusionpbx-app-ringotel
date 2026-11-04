@@ -465,18 +465,7 @@ class ringotel_api_functions {
 	 * @return type
 	 */
 	public function create_integration(array $param) {
-		$parameters = array(
-			'serviceid' => 'Bandwidth',
-			'state' => 1,
-			'profileid' => $param['profileid'],
-			'Username' => $param['Username'],
-			'Password' => $param['Password'],
-			'Account ID' => $param['Account_ID'],
-			'Application ID' => $param['Application_ID'],
-			'options' => '',
-			'redirect' => 'https://shell.ringotel.co/account/en-US/#/org/' . $param['profileid'] . '/integrations/Bandwidth'
-		);
-		return $this->ringotel_middleware_manager->handle($this->curl->get($this->baseUrl, $parameters));
+		return $this->set_integration($param, 1);
 	}
 
 	/**
@@ -485,16 +474,28 @@ class ringotel_api_functions {
 	 * @return type
 	 */
 	public function delete_integration(array $param) {
-		$parameters = array(
-			'serviceid' => 'Bandwidth',
-			'state' => 0,
-			'profileid' => $param['profileid'],
-			'Username' => $param['Username'],
-			'Password' => $param['Password'],
-			'Account ID' => $param['Account_ID'],
-			'Application ID' => $param['Application_ID'],
-			'options' => '',
-			'redirect' => 'https://shell.ringotel.co/account/en-US/#/org/' . $param['profileid'] . '/integrations/Bandwidth'
+		return $this->set_integration($param, 0);
+	}
+
+	/**
+	 * Turn an Integration on (1) or off (0): the same call the Ringotel portal makes, with the
+	 * provider's credential fields under their Ringotel names
+	 * @param array $param serviceid, profileid, credentials (Ringotel field name => value)
+	 * @param int $state
+	 * @return type
+	 */
+	private function set_integration(array $param, int $state) {
+		$parameters = array_merge(
+			array(
+				'serviceid' => $param['serviceid'],
+				'state' => $state,
+				'profileid' => $param['profileid'],
+			),
+			$param['credentials'],
+			array(
+				'options' => '',
+				'redirect' => 'https://shell.ringotel.co/account/en-US/#/org/' . $param['profileid'] . '/integrations/' . $param['serviceid']
+			)
 		);
 		return $this->ringotel_middleware_manager->handle($this->curl->get($this->baseUrl, $parameters));
 	}
@@ -540,8 +541,8 @@ class ringotel_api_functions {
 			"params" => array(
 				"orgid" => $param['orgid'],
 				"name" => $param['name'],
-				"number" => '+1' . $param['number'],
-				"service" => "Bandwidth",
+				"number" => $param['number'],
+				"service" => $param['service'],
 				"users" => $param['users'],
 				"sessionTimeout" => 0,
 				"country" => "US",
@@ -589,8 +590,8 @@ class ringotel_api_functions {
 					"autoreply" => "You have been removed from our list and will no longer receive messages. To resubscribe, send any message back.",
 					"keyword" => "STOP"
 				),
-				"number" => '+1' . $param['number'],
-				"service" => "Bandwidth",
+				"number" => $param['number'],
+				"service" => $param['service'],
 				"name" => $param['name'],
 				"sessionTimeout" => 0,
 				"id" => $param['id'],

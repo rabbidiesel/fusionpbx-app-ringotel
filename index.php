@@ -715,24 +715,6 @@ echo '	</div>';
 
 include "resources/footer.php";
 
-//inbound destinations for the Bandwidth integration (manage numbers)
-$destination_options = '';
-$sql = "select destination_number from v_destinations ";
-$sql .= "where domain_uuid = :domain_uuid ";
-$sql .= "and destination_type = :destination_type ";
-$sql .= "order by destination_number asc ";
-$parameters['destination_type'] = 'inbound';
-$parameters['domain_uuid'] = $_SESSION['domain_uuid'];
-$db = new database;
-$destinations = $db->select($sql, $parameters);
-unset($sql, $db, $parameters);
-if (is_array($destinations)) {
-	foreach ($destinations as $dest) {
-		$destination_options .= '<option value="' . escape($dest['destination_number']) . '">' . escape($dest['destination_number']) . '</option>';
-	}
-}
-unset($destinations, $dest);
-
 //styles and script of the page (the version query string makes browsers load a changed file)
 $css_file = '/app/ringotel/resources/css/ringotel.css';
 $js_file = '/app/ringotel/resources/javascript/ringotel.js';
@@ -746,7 +728,6 @@ echo "<link rel='stylesheet' type='text/css' href='" . PROJECT_PATH . $css_file 
 	const RINGOTEL_EXTENSIONS = <?php echo json_encode($extensions); ?>;
 	const RINGOTEL_DEFAULT_DOMAIN_UNIQUE_NAME = <?php echo json_encode($default_domain_unique_name); ?>;
 	const RINGOTEL_CONNECTION_DOMAIN = <?php echo json_encode($_SESSION['domain_name'] . ':' . $settings->get('ringotel', 'ringotel_organization_port', '5070')); ?>;
-	const RINGOTEL_DESTINATION_OPTIONS = <?php echo json_encode($destination_options); ?>;
 </script>
 <?php
 echo "<script language='JavaScript' type='text/javascript' src='" . PROJECT_PATH . $js_file . "?v=" . filemtime(dirname(__DIR__, 2) . $js_file) . "'></script>\n";
